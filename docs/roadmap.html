@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="90-day research roadmap: baseline, subgoal pipeline, SMC, safety envelope, sim-to-real, hardware, papers.">
+<title>π · 90-Day Roadmap — Steerable VLA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <span class="pi-mark">π</span>
+      <span class="brand-name">Steerable VLA <span>/ research proposal</span></span>
+    </a>
+    <nav>
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html">Study</a>
+      <a href="roadmap.html" class="active">Roadmap</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html">Papers</a>
+    </nav>
+  </div>
+</header>
+
+<div class="container">
+
+  <section class="hero" style="padding-bottom:40px;">
+    <div class="kicker">Ninety days · three milestones · two manuscripts</div>
+    <h1 class="display" style="font-size:clamp(1.9rem,4vw,2.9rem);">90-Day Research Roadmap</h1>
+    <p class="lede" style="max-width:640px;">
+      Thirteen weeks. Every number traceable to a committed artifact. Milestone gates:
+      <strong>M1</strong> (W4) SMC steering demo + safety filter in the loop · <strong>M2</strong>
+      (W6) full sim ablation suite · <strong>M3</strong> (W13) hardware results, both manuscripts
+      submitted, repo public.
+    </p>
+  </section>
+
+  <article class="prose narrow" style="max-width:900px;">
+
+    <h2 class="sec-title" style="margin-top:0;">Phase I · Foundation (W1–W3)</h2>
+    <div class="weeks">
+
+      <div class="week">
+        <span class="w-label">WEEK 1</span>
+        <div>
+          <div class="w-title">Baseline reproduction &amp; infra</div>
+          <div class="w-body">Reproduce a π0-style flow-matching VLA baseline (open weights) on Open X-Embodiment subset + LIBERO-style sim; verify 50 Hz receding-horizon execution. Stand up the evaluation harness with intervention-rate and jerk logging from day one. Inventory hardware; define the canonical action frame and write the FK converter.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 2</span>
+        <div>
+          <div class="w-title">Teleop data + subgoal extraction</div>
+          <div class="w-body">First 50 expert episodes across the three tasks, logged with raw video. Build the offline subgoal extractor: VLM keyframe selection → language-step labeling → language-conditioned synthesis of novel subgoal images. Segment action chunks at subgoal boundaries; sanity-check stability across repeated demos.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 3</span>
+        <div>
+          <div class="w-title">Procedural sim + subgoal-conditioned training</div>
+          <div class="w-body">Procedural simulators for all three tasks with aggressive domain randomization and ground-truth subgoal boundaries. First subgoal-conditioned training runs with the contrastive alignment loss. Scale sweep: subgoal density K vs. horizon — does dense coverage monotonically help beyond a floor?</div>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 class="sec-title">Phase II · Steerability &amp; safety (W4–W6)</h2>
+    <div class="weeks">
+
+      <div class="week">
+        <span class="w-label">WEEK 4</span>
+        <div>
+          <div class="w-title">SMC layer v1 + safety filter — M1</div>
+          <div class="w-body">Implement the SMC gated adapter: steering tokens, gate parameterization, anchoring constraint, Grönwall-bound calculator. Train with synthetic steering supervision (random perturbations relabeled as steering) so the adapter learns “absorb a correction, return to nominal” without human-in-the-loop. Implement the CBF–QP filter; measure solve time in the 50 Hz loop; offline falsification over steering amplitude/timing.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 5</span>
+        <div>
+          <div class="w-title">Sim evaluation suite, round 1</div>
+          <div class="w-body">All three tasks × held-out difficulty splits; baselines (RT-2-style, Diffusion Policy, ACT, vanilla π0-style, text-only-subgoal hierarchical) vs. the full system. First ablation pass: −SMC, −filter, −visual subgoals, −dense subgoals, −canonical frame. Leaderboard v1 with intervention rate + jerk as costs.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 6</span>
+        <div>
+          <div class="w-title">Data flywheel on sim deployment — M2</div>
+          <div class="w-body">Deploy in sim and run the curation loop: score rollouts, curate near-misses, relabel failures with the teleoperator as oracle, retrain, re-measure. Vary the curation rule (self vs. curated-relabel vs. blind-relabel) to confirm the compounding law transfers from the toy study to the VLA setting.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 class="sec-title">Phase III · Sim-to-real &amp; hardware (W7–W10)</h2>
+    <div class="weeks">
+
+      <div class="week">
+        <span class="w-label">WEEK 7</span>
+        <div>
+          <div class="w-title">Sim-to-real bridge</div>
+          <div class="w-body">Domain-randomization tuning against real teleop episodes; real-data mixing sweep (0 / 5 / 10 / 20% real teleop in the batch); subgoal supervision on real video. Sim-to-real gap report.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 8</span>
+        <div>
+          <div class="w-title">Real hardware: untangling + tool use</div>
+          <div class="w-body">Deploy on the rig for Task A and Task C: 100-episode eval sets, intervention-rate tracking, safety-filter logging. First real steering eval — human nudges mid-task; measure jerk under steering vs. without.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 9</span>
+        <div>
+          <div class="w-title">Real hardware: textile folding</div>
+          <div class="w-body">Task B with world-model replanning active; force-limit steering via the filter (contact forces capped in-task). Full three-task hardware suite green.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 10</span>
+        <div>
+          <div class="w-title">Zero-shot ablations on hardware</div>
+          <div class="w-body">Held-out morphologies/materials/tools on the real rig, per the pre-registered protocol — the actual zero-shot claim, measured. Component-to-metric attribution table.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 class="sec-title">Phase IV · Analysis &amp; release (W11–W13)</h2>
+    <div class="weeks">
+
+      <div class="week">
+        <span class="w-label">WEEK 11</span>
+        <div>
+          <div class="w-title">Mechanism analysis</div>
+          <div class="w-body">Error attribution (which failure class does each component remove?); steering amplitude/timing sweep vs. safety violations; composability study over unseen combinations of morphology × material × tool.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 12</span>
+        <div>
+          <div class="w-title">Figures, video, code cleanup</div>
+          <div class="w-body">Monochrome figure set (architecture, safety envelope, flywheel curves, zero-shot leaderboards); demo video with steering overlays; reproduce-everything pass — all numbers from committed artifacts.</div>
+        </div>
+      </div>
+
+      <div class="week">
+        <span class="w-label">WEEK 13</span>
+        <div>
+          <div class="w-title">Papers and release — M3</div>
+          <div class="w-body">Finalize the NMI and IEEE manuscripts; compile clean; submission checklists. Public release: repo with README, results, and this site.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 class="sec-title">Budget of effort &amp; risks</h2>
+    <div class="tablescroll">
+      <table>
+        <thead><tr><th>Phase</th><th>Weeks</th><th>Focus</th></tr></thead>
+        <tbody>
+          <tr><td>I. Foundation</td><td class="num">1–3</td><td>baseline, data, subgoal pipeline</td></tr>
+          <tr><td>II. Steerability &amp; safety</td><td class="num">4–6</td><td>SMC, CBF filter, sim ablations, flywheel</td></tr>
+          <tr><td>III. Sim-to-real &amp; hardware</td><td class="num">7–10</td><td>real untangling / folding / tool use, zero-shot</td></tr>
+          <tr><td>IV. Analysis &amp; release</td><td class="num">11–13</td><td>mechanism study, papers, release</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="tight" style="max-width:860px;">
+      <li><strong>Teleop throughput</strong> — hedge: procedural sim data is generated continuously from W3, so training never blocks on human hours.</li>
+      <li><strong>Real steering interface latency</strong> — hedge: steering validated in sim first; the filter bounds deviation regardless of interface.</li>
+      <li><strong>Task B hardware difficulty</strong> — hedge: folding is last, so failures cannot block the untangling/tool-use results.</li>
+      <li><strong>Compute</strong> — hedge: the flow expert is 2–3B active parameters; ablations run at fixed budget with early stopping, scheduling-bound rather than compute-bound.</li>
+    </ul>
+
+  </article>
+
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <div>
+      <span class="mono">π</span>&nbsp;&nbsp;Steerable VLA — 90-Day Roadmap<br>
+      Thirteen weeks · three milestone gates · two manuscripts · zero hand-typed numbers
+    </div>
+    <div class="foot-links">
+      <a href="index.html">Home</a>
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html">Study</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html">Papers</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

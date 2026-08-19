@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Steerable VLA — compositional generalization in embodied foundation models via multimodal subgoal prompting and flow-based action execution. Research proposal, manuscripts, and 90-day roadmap.">
+<title>π · Steerable VLA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <span class="pi-mark">π</span>
+      <span class="brand-name">Steerable VLA <span>/ research proposal</span></span>
+    </a>
+    <nav>
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html">Study</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html">Papers</a>
+    </nav>
+  </div>
+</header>
+
+<div class="container">
+
+  <section class="hero">
+    <div class="kicker">Research proposal · 2026 · Physical Intelligence internship target</div>
+    <h1 class="display">Compositional Generalization in Embodied Foundation Models via Multimodal Subgoal Prompting and Flow-Based Action Execution</h1>
+    <p class="lede">
+      Generalist robot policies scale to thousands of tasks and still fail the test that
+      defines embodied intelligence: a <strong>long-horizon</strong> task on an
+      <strong>unseen</strong> object, with an <strong>unseen</strong> morphology, in a world
+      that does not hold still. The thesis: generalization is not produced by scaling a
+      monolithic vision-language-action network — it is produced by
+      <strong>structuring the problem</strong> into a steerable hierarchy: a VLM that plans
+      in dense visual subgoals, a flow-matching expert that executes between them, a
+      steerable conditioning layer with a certified no-jerk bound, and a runtime
+      formal-verification safety envelope.
+    </p>
+    <div class="hero-links">
+      <span class="mono"><a class="mono-link" href="proposal.html">proposal →</a></span>
+      <span class="mono"><a class="mono-link" href="study.html">the study (GPU) →</a></span>
+      <span class="mono"><a class="mono-link" href="papers.html">manuscripts (NMI · IEEE) →</a></span>
+      <span class="mono"><a class="mono-link" href="roadmap.html">90-day plan →</a></span>
+      <span class="mono"><a class="mono-link" href="sop.html">statement of purpose →</a></span>
+      <span class="mono"><a class="mono-link" href="https://github.com/sehajr-singhs/steerable-vla">github →</a></span>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">01 /</span>
+      <h2 class="sec-title">The thesis</h2>
+    </div>
+    <div class="narrow">
+      <p class="body">
+        Pure hardcoded logic fails because the real world has infinite variance — the state
+        space of a deformable cable or a draped textile cannot be enumerated. Pure neural
+        nets fail because they lack strict spatial-temporal anchors — a monolithic forward
+        pass has no mechanism for re-anchoring when the world moves, no channel for a human
+        to correct a subgoal mid-task, and no certificate that the executed trajectory stays
+        safe.
+      </p>
+      <p class="body">
+        The way through is to <em>structure</em> the problem. A high-level VLM provides
+        semantic context and dense <em>visual</em> subgoal predictions; a low-level
+        continuous-time flow-matching expert provides high-frequency, smooth action
+        execution; between them, a steerable conditioning layer admits corrections with a
+        provable smoothness envelope; around all of it, a control-barrier-function filter
+        verifies every action at runtime.
+      </p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">02 /</span>
+      <h2 class="sec-title">The paradigm</h2>
+    </div>
+    <div class="claims">
+      <div class="claim">
+        <span class="claim-num">COMPOSITION</span>
+        <h3>Subgoal factorization, not weight scaling</h3>
+        <p>
+          The policy factorizes at the subgoal level: each flow segment is conditioned on one
+          visual keyframe, so skills compose across tasks — the composition happens in the
+          conditioning, not inside a single weight matrix.
+        </p>
+      </div>
+      <div class="claim">
+        <span class="claim-num">STEERABILITY</span>
+        <h3>Corrections with a certified no-jerk bound</h3>
+        <p>
+          Human nudges, world-model replans, and constraint setpoints enter the flow through
+          bounded-Lipschitz gates. A Grönwall-type bound certifies how far a correction may
+          move the trajectory — steering without jerks, by construction.
+        </p>
+      </div>
+      <div class="claim">
+        <span class="claim-num">VERIFICATION</span>
+        <h3>A runtime safety envelope, not a hope</h3>
+        <p>
+          A control-barrier-function QP filter projects every commanded action onto the
+          admissible set with a forward-invariance guarantee. Steerability is admitted only
+          through the filter — corrections reshape the trajectory inside the certified tube.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">03 /</span>
+      <h2 class="sec-title">The architecture</h2>
+    </div>
+    <div class="narrow">
+      <p class="body">
+        A 3B+ vision-language planner <span class="mono" style="font-size:0.85em;">Λ<sub>φ</sub></span>
+        maps instruction and observation to dense subgoals
+        <span class="mono" style="font-size:0.85em;">g<sub>1:K</sub> = (κ<sub>k</sub>, ℓ<sub>k</sub>)</span>
+        — predicted keyframes plus language steps. The flow-matching expert
+        <span class="mono" style="font-size:0.85em;">v<sub>θ</sub>(x<sub>s</sub>, s, c)</span>
+        integrates a learned velocity field over an ODE path with 2–10 steps at 50 Hz, in a
+        canonical cross-embodiment action frame. Steering signals enter through the SMC
+        adapter; the CBF–QP filter gates every action before the actuators.
+      </p>
+      <figure>
+        <img src="figs/fig1_architecture.png" alt="Steerable VLA hierarchy: VLM planner, SMC layer, flow-matching expert, CBF-QP safety filter, robot">
+        <figcaption>
+          The Steerable VLA Flow-Matching Hierarchy. Dense visual subgoals from the planner
+          condition each flow segment; the SMC layer steers mid-execution; the CBF–QP filter
+          verifies every action at runtime; observation feedback closes the loop.
+        </figcaption>
+      </figure>
+      <div class="eq">
+        <em>v</em><sub>θ</sub><sup>S</sup>(<em>x</em><sub>s</sub>, <em>s</em>, <em>c</em>, <em>u</em>)
+        &nbsp;=&nbsp; <em>v</em><sub>θ</sub><sup>N</sup>(<em>x</em><sub>s</sub>, <em>s</em>, <em>c</em>)
+        + Σ<sub>j</sub> λ<sub>j</sub>(<em>x</em><sub>s</sub>, <em>s</em>) ·
+        <em>v</em><sub>θ</sub><sup>j</sup>(<em>x</em><sub>s</sub>, <em>s</em>, <em>u</em><sub>j</sub>)
+        <span class="eqtag">(1)</span>
+      </div>
+      <p class="body dim" style="font-size:0.85rem;">
+        Anchored steering: <em>v</em><sub>θ</sub><sup>j</sup>(·, <em>u</em><sup>0</sup>) ≡ 0 recovers the
+        nominal field exactly; gates λ<sub>j</sub> = σ(<em>w</em><sub>j</sub><sup>T</sup>φ) engage
+        softly. Grönwall: ‖<em>x</em><sub>S</sub> − <em>x</em><sub>N</sub>‖ ≤
+        (<em>M</em>/<em>L</em><sub>v</sub>)(e<sup><em>L<sub>v</sub></em>Δ<em>s</em></sup> − 1).
+        Full formulation in the <a href="proposal.html">proposal</a>.
+      </p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">04 /</span>
+      <h2 class="sec-title">The benchmarks</h2>
+    </div>
+    <p class="body" style="margin-bottom:26px;">
+      Three tasks selected to be maximally chaotic — non-rigid, high-entropy, long-horizon —
+      in ways that defeat both hardcoded logic and monolithic imitation. Zero-shot protocol:
+      entire morphologies, material regimes, and tool classes held out of every training
+      source; intervention rate and jerk reported as costs.
+    </p>
+    <div class="tasks">
+      <div class="task">
+        <span class="task-letter">TASK A</span>
+        <h3>Cable untangling</h3>
+        <p>
+          A deformable cable in a crossed configuration must reach a knot-free target.
+          Held-out: stiffness, length, crossing topology, friction.
+        </p>
+        <span class="tag">non-rigid</span>
+        <span class="tag">contact-rich</span>
+      </div>
+      <div class="task">
+        <span class="task-letter">TASK B</span>
+        <h3>Textile folding</h3>
+        <p>
+          Fold a fabric that shifts under its own drape — subgoal images go stale and must be
+          re-anchored. Held-out: material classes, fold geometry.
+        </p>
+        <span class="tag">shifting state</span>
+        <span class="tag">replan-heavy</span>
+      </div>
+      <div class="task">
+        <span class="task-letter">TASK C</span>
+        <h3>Adaptive tool use in clutter</h3>
+        <p>
+          Retrieve, lever, or pull with tools never seen. Held-out: tool morphology classes,
+          clutter density, affordance composition.
+        </p>
+        <span class="tag">semantic + geometric</span>
+        <span class="tag">clutter</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">05 /</span>
+      <h2 class="sec-title">The study</h2>
+    </div>
+    <p class="body">
+      The full paradigm implemented at miniature scale — a cable-untangling experiment
+      with the flow-matching action expert, steerable conditioning, the CBF–QP safety
+      envelope, and the data flywheel, run end-to-end on GPU. Zero-shot protocol: trained
+      on two crossing topologies, evaluated on held-out topologies and stiffnesses.
+    </p>
+    <div class="metric-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline); margin-top:18px;">
+      <div class="metric"><div class="m-val" id="m-expert">—</div><div class="m-name">expert ceiling (held-out)</div></div>
+      <div class="metric"><div class="m-val" id="m-nis">—</div><div class="m-name">no-intervention success</div></div>
+      <div class="metric"><div class="m-val" id="m-viol">—</div><div class="m-name">safety violations</div></div>
+      <div class="metric"><div class="m-val" id="m-fly">—</div><div class="m-name">flywheel relabel (iter → final)</div></div>
+    </div>
+    <p class="table-note">numbers render from committed <span class="mono" style="font-size:0.82em;">results/*.json</span> when the GPU run lands — see the <a href="study.html">study page</a>.</p>
+    <div class="hero-links" style="margin-top:22px;">
+      <span class="mono"><a class="mono-link" href="study.html">the study → pipeline · protocol · results</a></span>
+      <span class="mono"><a class="mono-link" href="proposal.html">proposal (title · architecture · experiments)</a></span>
+      <span class="mono"><a class="mono-link" href="papers.html">nmi_paper.pdf · ieee_paper.pdf</a></span>
+      <span class="mono"><a class="mono-link" href="sop.html">statement of purpose</a></span>
+      <span class="mono"><a class="mono-link" href="roadmap.html">90-day research roadmap</a></span>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <div>
+      <span class="mono">π</span>&nbsp;&nbsp;Steerable VLA — Compositional Generalization in Embodied Foundation Models<br>
+      Sehaj Singh · Independent Research · 2026 · every number traces to a committed artifact · study runs on Kaggle GPU
+    </div>
+    <div class="foot-links">
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html">Study</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html">Papers</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+fetch('results.json').then(r => r.json()).then(d => {
+  if (!d) return;
+  if (d.expert) {
+    document.getElementById('m-expert').textContent = d.expert.held;
+  }
+  if (d.main && d.main.length) {
+    const full = d.main.filter(r => r.variant === 'ours_full');
+    if (full.length) {
+      const avg = k => (full.reduce((s, r) => s + r[k], 0) / full.length).toFixed(3);
+      document.getElementById('m-nis').textContent = avg('ni_success');
+      document.getElementById('m-viol').textContent = avg('violations');
+    }
+  }
+  if (d.flywheel && d.flywheel.relabel && d.flywheel.relabel.curve.length) {
+    const c = d.flywheel.relabel.curve;
+    document.getElementById('m-fly').textContent = c[0] + ' → ' + c[c.length - 1];
+  }
+}).catch(() => {});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The Steerable VLA miniature study — a complete, reproducible cable-untangling experiment: expert demos, flow-matching action expert, steerable conditioning, CBF–QP safety filter, and a data flywheel, run on GPU via Kaggle.">
+<title>π · Study — Steerable VLA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<style>
+  .stack { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); margin-top: 10px; }
+  .stack-item { background: var(--paper); padding: 26px 26px 30px; }
+  .stack-item .tag { display: inline-block; margin-bottom: 12px; }
+  .stack-item h3 { font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
+  .stack-item p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .pipeline { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; line-height: 2.0; }
+  .pipeline b { color: var(--ink); }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); margin: 14px 0 6px; }
+  .metric { background: var(--paper); padding: 22px 24px; }
+  .metric .m-val { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; }
+  .metric .m-name { font-size: 0.72rem; letter-spacing: 0.14em; color: var(--faint); margin-top: 6px; text-transform: uppercase; }
+  .dim { color: var(--muted); font-size: 0.85rem; }
+  @media (max-width: 820px) { .stack, .metric-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <span class="pi-mark">π</span>
+      <span class="brand-name">Steerable VLA <span>/ the study</span></span>
+    </a>
+    <nav>
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html" class="active">Study</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html">Papers</a>
+    </nav>
+  </div>
+</header>
+
+<div class="container">
+
+  <section class="hero" style="padding-bottom:40px;">
+    <div class="kicker">A faithful miniature · every component of the proposal · every number committed</div>
+    <h1 class="display" style="font-size:clamp(1.9rem,4vw,2.9rem);">The study</h1>
+    <p class="lede" style="max-width:660px;">
+      The full paradigm — subgoal conditioning, flow-based action execution, gated
+      steerability, and a verified safety envelope — implemented at miniature scale as a
+      cable-untangling experiment, run end-to-end on GPU. Zero-shot protocol: policies train
+      on two crossing-topology families and are evaluated on held-out topologies and
+      material stiffnesses they never saw.
+    </p>
+    <div class="hero-links">
+      <span class="mono"><a class="mono-link" href="https://github.com/sehajr-singhs/steerable-vla">github repo →</a></span>
+      <span class="mono"><a class="mono-link" href="https://huggingface.co/spaces/sehajr-singhs/steerable-vla-demo">live demo (HF Space) →</a></span>
+      <span class="mono"><a class="mono-link" href="https://www.kaggle.com/sehajrsingh/steerable-vla-gpu-study">GPU study (Kaggle) →</a></span>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">01 /</span>
+      <h2 class="sec-title">Why a cable</h2>
+    </div>
+    <div class="narrow">
+      <p class="body">
+        A deformable cable in a crossed configuration is the smallest task with the
+        proposal's defining failure modes: the state is <em>contact-rich and non-rigid</em>
+        (a random walk never untangles itself — tangles persist unless the gripper resolves
+        them), the space of configurations is <em>effectively unbounded</em> (impossible to
+        enumerate in hardcoded logic), and the task is <em>long-horizon</em> (every crossing
+        must be cleared in the right order without re-folding the cable).
+      </p>
+      <p class="body">
+        The simulator is a position-based-dynamics chain with fixed segment lengths, free
+        hinges, and <em>localized constraint propagation</em>: a pull bends the strand the
+        gripper holds while distant units stay put — tangles persist until the policy
+        actively resolves them, and a do-nothing policy provably fails.
+      </p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">02 /</span>
+      <h2 class="sec-title">The pipeline</h2>
+    </div>
+    <p class="body" style="margin-bottom:22px;">
+      Every stage of the full proposal has a faithful counterpart in code
+      (<span class="mono" style="font-size:0.85em;">src/steerable/</span>), and the study
+      runs as one command.
+    </p>
+    <div class="stack">
+      <div class="stack-item">
+        <span class="tag">DATA</span>
+        <h3>Expert demos → subgoal segmentation</h3>
+        <p>
+          The oracle teleoperator (a search-based untangling expert) generates
+          demonstrations. Milestone snapshots become subgoals; the first-crossing point
+          relative to the gripper is the "act here" conditioning signal — the miniature's
+          stand-in for a VLM-extracted visual subgoal. Synthetic subgoal noise densifies the
+          conditioning distribution.
+        </p>
+      </div>
+      <div class="stack-item">
+        <span class="tag">MOTOR</span>
+        <h3>Flow-matching action expert</h3>
+        <p>
+          A conditional flow-matching model integrates a learned velocity field over action
+          chunks: continuous gripper deltas by flow, the discrete grab decision by a separate
+          Bernoulli head — decoupled exactly as real VLA systems separate grasp from motion.
+          Inference averages multiple flow samples.
+        </p>
+      </div>
+      <div class="stack-item">
+        <span class="tag">STEER + VERIFY</span>
+        <h3>SMC steering · CBF–QP filter</h3>
+        <p>
+          The steerable conditioning layer adds a gated correction field anchored at
+          <em>u</em>=0; the control-barrier-function QP filter projects every commanded
+          action onto the safe workspace with discrete forward invariance, and the
+          environment counts bound violations instead of clipping silently.
+        </p>
+      </div>
+    </div>
+    <div class="pipeline" style="margin-top:26px;">
+      <b>expert demos</b> → <b>chunk + subgoal</b> → <b>CFM loss / BCE</b> → <b>flow policy</b>
+      → <b>CBF–QP filter</b> → <b>deploy</b> → <b>score</b> → <b>curate near-misses /
+      relabel failures (DAgger)</b> → <b>retrain</b> → …
+      <br><span class="dim">the data flywheel — the loop only spins if the labels come back.</span>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">03 /</span>
+      <h2 class="sec-title">The protocol</h2>
+    </div>
+    <div class="narrow">
+      <p class="body">
+        Pre-registered and committed (<span class="mono" style="font-size:0.85em;">scripts/run_experiment.py</span>):
+      </p>
+      <p class="body" style="font-size:0.9rem; line-height:2.0;">
+        <b>Variants</b> — <span class="mono">bc</span> (flat behavioral cloning) ·
+        <span class="mono">flow_flat</span> (flow matching, no subgoals, no steering) ·
+        <span class="mono">ours_nofilter</span> (subgoals + SMC, no safety filter) ·
+        <span class="mono">ours_full</span> (everything) — × 3 seeds.<br>
+        <b>Train</b> — crossing topologies {2, 3}, stiffness × {0.9, 1.1}.<br>
+        <b>Zero-shot eval</b> — held-out topology {4}, stiffness × {0.6, 1.5}, fresh starts.<br>
+        <b>Metrics</b> — success · no-intervention success · crossings reduced · steps ·
+        max jerk · safety violations · oracle interventions (reported as a cost).<br>
+        <b>Flywheel</b> — the same policy under three curation strategies: none
+        (control) · near-miss curation · oracle relabeling (DAgger).
+      </p>
+      <p class="body dim" style="font-size:0.82rem;">
+        Interventions are the deployment-cost channel: if the policy stalls, an oracle
+        assist performs one maneuver (capped), then the policy continues. No-intervention
+        success counts only episodes the policy solves on its own.
+      </p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">04 /</span>
+      <h2 class="sec-title">Results</h2>
+    </div>
+    <div class="narrow">
+      <p class="body" style="margin-bottom:18px;">
+        Rendered from <span class="mono" style="font-size:0.85em;">results/*.json</span> —
+        committed experiment artifacts, never hand-typed. Regenerate with
+        <span class="mono" style="font-size:0.85em;">PYTHONPATH=src python scripts/render_results.py</span>.
+      </p>
+      <div id="study-results">
+        <p class="body dim">Loading committed results …</p>
+      </div>
+      <p class="table-note" id="study-note"></p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">05 /</span>
+      <h2 class="sec-title">Reproduce</h2>
+    </div>
+    <div class="eq" style="font-family:'IBM Plex Mono',monospace; font-size:0.82rem; line-height:2.0;">
+      pip install -r requirements.txt<br>
+      <span style="color:var(--faint);"># full study (GPU): 4 variants × 3 seeds + flywheel + expert ceiling</span><br>
+      PYTHONPATH=src python scripts/run_experiment.py --protocols all --seeds 3<br>
+      <span style="color:var(--faint);"># the study also runs as a Kaggle GPU kernel (link above) and on Lightning AI</span><br>
+      PYTHONPATH=src python scripts/run_lightning.py<br>
+      <span style="color:var(--faint);"># render this page's tables from the committed JSONs</span><br>
+      PYTHONPATH=src python scripts/render_results.py<br>
+      <span style="color:var(--faint);"># smoke test (minutes on CPU)</span><br>
+      PYTHONPATH=src python scripts/run_experiment.py --smoke
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <div>
+      <span class="mono">π</span>&nbsp;&nbsp;Steerable VLA — the study<br>
+      miniature cable-untangling study · flow-matching expert · SMC steering · CBF–QP filter · data flywheel · GPU (Kaggle)
+    </div>
+    <div class="foot-links">
+      <a href="index.html">Home</a>
+      <a href="proposal.html">Proposal</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html">Papers</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// results.json is generated from results/*.json by scripts/render_results.py
+fetch('results.json').then(r => r.json()).then(d => {
+  const el = document.getElementById('study-results');
+  if (!d || !d.main || !d.main.length) {
+    el.innerHTML = '<p class="body dim">The committed study run is in flight — results.json will render here the moment the GPU run lands and render_results.py runs.</p>';
+    return;
+  }
+  const vname = {bc:'BC (flat MLP)', flow_flat:'Flow (no subgoals)', ours_nofilter:'Ours − safety filter', ours_full:'Ours (full)'};
+  let h = '<div class="tablescroll"><table><thead><tr>' +
+    '<th>variant</th><th>success</th><th>no-interv.</th><th>crossings↓</th><th>steps</th>' +
+    '<th>max jerk</th><th>violations</th><th>interventions</th></tr></thead><tbody>';
+  d.main.forEach(r => {
+    h += '<tr><td><b>' + (vname[r.variant] || r.variant) + '</b></td>' +
+      '<td>' + r.success + '</td><td><b>' + r.ni_success + '</b></td>' +
+      '<td>' + r.crossings_reduced + '</td><td>' + r.steps + '</td>' +
+      '<td>' + r.jerk + '</td><td>' + r.violations + '</td>' +
+      '<td>' + r.interventions + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (d.expert) {
+    h += '<p class="body" style="margin-top:20px;"><b>Expert ceiling</b> (the oracle the policies imitate): train ' +
+      d.expert.train + ' · held-out ' + d.expert.held + '.</p>';
+  }
+  if (d.flywheel) {
+    h += '<p class="body" style="margin-top:14px;"><b>Data flywheel</b> — deployment success per iteration:</p>';
+    h += '<div class="tablescroll"><table><thead><tr><th>strategy</th>';
+    const n = Math.max(...Object.values(d.flywheel).map(x => x.curve.length));
+    for (let i = 0; i < n; i++) h += '<th>iter ' + i + '</th>';
+    h += '</tr></thead><tbody>';
+    const fname = {none:'none (control)', near_miss:'near-miss curation', relabel:'oracle relabel (DAgger)'};
+    for (const s of ['none','near_miss','relabel']) {
+      if (!d.flywheel[s]) continue;
+      h += '<tr><td>' + (fname[s] || s) + '</td>';
+      d.flywheel[s].curve.forEach(c => h += '<td>' + c + '</td>');
+      for (let i = d.flywheel[s].curve.length; i < n; i++) h += '<td>—</td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  el.innerHTML = h;
+  document.getElementById('study-note').textContent =
+    'mean over seeds · held-out topology {4} · stiffness {0.6, 1.5} · n=' +
+    (d.main && d.main[0] ? d.main[0].n : '—') + ' episodes per variant-seed';
+}).catch(() => {
+  document.getElementById('study-results').innerHTML =
+    '<p class="body dim">results.json not found — run scripts/render_results.py after a study run.</p>';
+});
+</script>
+
+</body>
+</html>

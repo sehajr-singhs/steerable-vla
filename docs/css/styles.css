@@ -1,0 +1,219 @@
+/* ============================================================
+   Steerable VLA — site styles
+   Stark monochrome, heavy whitespace, academic legibility.
+   ============================================================ */
+
+:root {
+  --ink: #0a0a0a;
+  --charcoal: #1a1a1a;
+  --muted: #555555;
+  --faint: #8f8f8f;
+  --hairline: #e4e4e4;
+  --paper: #ffffff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { background: var(--paper); }
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.mono, .kicker, .nav, .foot, .eqlabel, .tag, code, .num {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
+    Consolas, monospace;
+}
+
+a { color: var(--ink); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+a.mono-link { border-bottom: 1px solid var(--hairline); padding-bottom: 1px; }
+a.mono-link:hover { border-color: var(--ink); text-decoration: none; }
+
+.container { max-width: 1060px; margin: 0 auto; padding: 0 40px; }
+.narrow { max-width: 780px; margin: 0 auto; }
+
+/* ---------- header ---------- */
+
+header {
+  border-bottom: 1px solid var(--hairline);
+}
+.header-inner {
+  max-width: 1060px; margin: 0 auto; padding: 18px 40px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.pi-mark {
+  width: 30px; height: 30px; border: 1.5px solid var(--ink);
+  display: grid; place-items: center;
+  font-size: 17px; font-weight: 400; line-height: 1;
+  font-family: Georgia, "Times New Roman", serif;
+}
+.brand-name { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+.brand-name span { color: var(--faint); font-weight: 400; }
+nav { display: flex; gap: 26px; }
+nav a {
+  font-size: 12.5px; color: var(--muted); letter-spacing: 0.02em;
+}
+nav a:hover { color: var(--ink); text-decoration: none; }
+nav a.active { color: var(--ink); border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+
+/* ---------- hero ---------- */
+
+.hero { padding: 110px 0 84px; }
+.kicker {
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 26px;
+}
+.display {
+  font-size: clamp(2.3rem, 5.2vw, 3.9rem);
+  font-weight: 650; letter-spacing: -0.035em; line-height: 1.04;
+  max-width: 900px; text-wrap: balance;
+}
+.lede {
+  margin-top: 30px; font-size: 1.13rem; line-height: 1.65;
+  color: var(--muted); max-width: 680px;
+}
+.lede strong { color: var(--ink); font-weight: 600; }
+.hero-links {
+  margin-top: 40px; display: flex; flex-wrap: wrap; gap: 8px 34px;
+  font-size: 12.5px; color: var(--muted);
+}
+.hero-links .mono { font-size: 12px; letter-spacing: 0.02em; }
+
+/* ---------- sections ---------- */
+
+section.block { padding: 74px 0 8px; border-top: 1px solid var(--hairline); }
+section.block:first-of-type { border-top: none; }
+.sec-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 30px; }
+.sec-num { font-size: 11.5px; color: var(--faint); letter-spacing: 0.14em; }
+h2.sec-title { font-size: 1.55rem; font-weight: 600; letter-spacing: -0.02em; }
+h3.sub { font-size: 1.02rem; font-weight: 600; letter-spacing: -0.01em; margin: 34px 0 12px; }
+p.body { color: var(--charcoal); max-width: 720px; margin-bottom: 16px; }
+p.body .dim { color: var(--faint); }
+ul.tight { list-style: none; max-width: 720px; }
+ul.tight li {
+  padding-left: 22px; position: relative; margin-bottom: 12px; color: var(--charcoal);
+}
+ul.tight li::before { content: "—"; position: absolute; left: 0; color: var(--faint); }
+
+/* ---------- claims grid ---------- */
+
+.claims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 10px; }
+.claim .claim-num {
+  font-size: 11px; letter-spacing: 0.16em; color: var(--faint);
+  margin-bottom: 12px; display: block;
+}
+.claim h3 { font-size: 0.98rem; font-weight: 600; margin-bottom: 8px; line-height: 1.35; }
+.claim p { font-size: 0.9rem; color: var(--muted); line-height: 1.55; }
+
+/* ---------- figure ---------- */
+
+figure { margin: 34px 0 6px; }
+figure img { width: 100%; border: 1px solid var(--hairline); display: block; }
+figcaption {
+  margin-top: 12px; font-size: 0.8rem; color: var(--faint); line-height: 1.55;
+  max-width: 780px;
+}
+
+/* ---------- equations ---------- */
+
+.eq {
+  margin: 20px 0; padding: 14px 22px; border-left: 1px solid var(--ink);
+  font-size: 0.96rem; overflow-x: auto;
+}
+.eq .frac { display: inline-block; text-align: center; vertical-align: middle; margin: 0 3px; }
+.eq .frac .top { display: block; border-bottom: 1px solid var(--ink); padding: 0 6px 2px; }
+.eq .frac .bot { display: block; padding: 2px 6px 0; }
+.eq .eqtag { float: right; color: var(--faint); font-size: 0.82rem; }
+
+/* ---------- task cards ---------- */
+
+.tasks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); }
+.task { background: var(--paper); padding: 30px 28px 34px; }
+.task .task-letter {
+  display: inline-block; font-size: 11px; letter-spacing: 0.16em;
+  color: var(--faint); margin-bottom: 14px;
+}
+.task h3 { font-size: 1.02rem; font-weight: 600; margin-bottom: 10px; }
+.task p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+.task .tag {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--hairline); padding: 3px 8px;
+  margin-right: 6px;
+}
+
+/* ---------- tables ---------- */
+
+.tablescroll { overflow-x: auto; margin: 26px 0 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th {
+  text-align: left; font-weight: 600; font-size: 0.76rem;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+  border-top: 1.5px solid var(--ink); border-bottom: 1px solid var(--hairline);
+  padding: 10px 14px 10px 0; white-space: nowrap;
+}
+td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--hairline); color: var(--charcoal); vertical-align: top; }
+td.num { font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+.table-note { font-size: 0.78rem; color: var(--faint); margin-top: 10px; }
+
+/* ---------- prose pages (proposal / roadmap / sop) ---------- */
+
+article.prose h2.sec-title { margin-top: 60px; }
+article.prose .sec-num { display: block; margin-bottom: 10px; }
+article.prose p { max-width: 720px; color: var(--charcoal); margin-bottom: 16px; }
+article.prose ul, article.prose ol { max-width: 700px; margin: 0 0 16px 22px; }
+article.prose li { margin-bottom: 8px; }
+article.prose blockquote {
+  border-left: 1px solid var(--ink); padding: 4px 0 4px 22px; margin: 22px 0;
+  color: var(--muted); font-size: 0.96rem; max-width: 700px;
+}
+article.prose .dim { color: var(--faint); }
+
+.weeks { margin-top: 26px; }
+.week { display: grid; grid-template-columns: 120px 1fr; gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--hairline); }
+.week .w-label { font-size: 11px; letter-spacing: 0.14em; color: var(--faint); padding-top: 3px; }
+.week .w-title { font-weight: 600; font-size: 0.98rem; margin-bottom: 6px; }
+.week .w-body { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+
+/* ---------- paper cards ---------- */
+
+.papers { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); }
+.paper { background: var(--paper); padding: 34px 32px 38px; }
+.paper .paper-fmt { font-size: 11px; letter-spacing: 0.16em; color: var(--faint); display: block; margin-bottom: 14px; }
+.paper h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; line-height: 1.35; }
+.paper p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+.paper .dl { font-size: 12px; }
+
+/* ---------- footer ---------- */
+
+footer { border-top: 1px solid var(--hairline); margin-top: 90px; }
+.foot-inner {
+  max-width: 1060px; margin: 0 auto; padding: 34px 40px 60px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 30px; font-size: 0.8rem; color: var(--faint); line-height: 1.7;
+}
+.foot-inner .mono { font-size: 11.5px; letter-spacing: 0.06em; }
+.foot-links { display: flex; gap: 22px; }
+.foot-links a { color: var(--faint); font-size: 0.8rem; }
+.foot-links a:hover { color: var(--ink); }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 860px) {
+  .container, .header-inner, .foot-inner { padding-left: 22px; padding-right: 22px; }
+  .hero { padding: 70px 0 54px; }
+  .claims, .tasks, .papers { grid-template-columns: 1fr; }
+  .claims { gap: 26px; }
+  .week { grid-template-columns: 1fr; gap: 6px; }
+  nav { gap: 16px; }
+  .display { font-size: 2rem; }
+}

@@ -1,0 +1,14 @@
+{
+  "variant": "bc",
+  "seed": 0,
+  "n_demos": 8,
+  "epochs": 2,
+  "success": 1.0,
+  "ni_success": 0.0,
+  "crossings_reduced": 4.0,
+  "steps": 32.0,
+  "jerk": 468.1679017882164,
+  "violations": 8.333333333333334,
+  "interventions": 1.3333333333333333,
+  "n": 3
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The manuscripts: Nature Machine Intelligence format and IEEE format, compiled from LaTeX, both clean.">
+<title>π · Papers — Steerable VLA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="brand" href="index.html">
+      <span class="pi-mark">π</span>
+      <span class="brand-name">Steerable VLA <span>/ research proposal</span></span>
+    </a>
+    <nav>
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html">Study</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="sop.html">SOP</a>
+      <a href="papers.html" class="active">Papers</a>
+    </nav>
+  </div>
+</header>
+
+<div class="container">
+
+  <section class="hero" style="padding-bottom:40px;">
+    <div class="kicker">Two manuscripts · one architecture · every number committed</div>
+    <h1 class="display" style="font-size:clamp(1.9rem,4vw,2.9rem);">The manuscripts</h1>
+    <p class="lede" style="max-width:640px;">
+      Both manuscripts compile clean from source (NMI: <span class="mono" style="font-size:0.85em;">xelatex nmi_paper.tex</span>
+      · IEEE: <span class="mono" style="font-size:0.85em;">pdflatex ieee_paper.tex</span>).
+      Result tables are populated by the committed experiment harness specified in the
+      protocol — no hand-typed numbers.
+    </p>
+  </section>
+
+  <div class="papers">
+    <div class="paper">
+      <span class="paper-fmt">NATURE MACHINE INTELLIGENCE FORMAT</span>
+      <h3>Compositional Generalization in Embodied Foundation Models via Multimodal Subgoal Prompting and Flow-Based Action Execution</h3>
+      <p>
+        8 pages · full architecture and safety theory (no-jerk theorem, forward-invariance
+        proposition, Grönwall bound) · the three chaotic benchmarks · pre-registered zero-shot
+        protocol · discussion that states the falsification conditions.
+      </p>
+      <p class="dl mono"><a class="mono-link" href="papers/nmi_paper.pdf">nmi_paper.pdf →</a>
+        &nbsp;·&nbsp; <a class="mono-link" href="papers/nmi_paper.tex">source →</a></p>
+    </div>
+    <div class="paper">
+      <span class="paper-fmt">IEEE CONFERENCE FORMAT (IEEETRAN)</span>
+      <h3>Steerable Vision-Language-Action Flow Matching: Multimodal Subgoal Prompting and Runtime-Verified Execution</h3>
+      <p>
+        3 pages · dense two-column · related work across VLA, hierarchical policies, flow
+        matching, and safety filters · full method (SMC, CBF–QP) · ablation design table with
+        claimed component-to-metric effects.
+      </p>
+      <p class="dl mono"><a class="mono-link" href="papers/ieee_paper.pdf">ieee_paper.pdf →</a>
+        &nbsp;·&nbsp; <a class="mono-link" href="papers/ieee_paper.tex">source →</a></p>
+    </div>
+  </div>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">/</span>
+      <h2 class="sec-title">Reproduce</h2>
+    </div>
+    <div class="eq" style="font-family:'IBM Plex Mono',monospace; font-size:0.82rem; line-height:1.9;">
+      xelatex nmi_paper.tex      <span style="color:var(--faint);"># Nature Machine Intelligence format → nmi_paper.pdf</span><br>
+      pdflatex ieee_paper.tex    <span style="color:var(--faint);"># IEEE conference format → ieee_paper.pdf</span><br>
+      python make_fig.py         <span style="color:var(--faint);"># fig1_architecture.png (monochrome, no color)</span>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="foot-inner">
+    <div>
+      <span class="mono">π</span>&nbsp;&nbsp;Steerable VLA — Manuscripts<br>
+      NMI (xelatex) · IEEE (pdflatex) · both compile clean · results from the committed harness
+    </div>
+    <div class="foot-links">
+      <a href="index.html">Home</a>
+      <a href="proposal.html">Proposal</a>
+      <a href="study.html">Study</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="sop.html">SOP</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

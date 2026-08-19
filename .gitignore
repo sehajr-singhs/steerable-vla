@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.synctex.gz
+.DS_Store
+models/
+runs/
+wandb/
+kaggle/output/
+results/*.png
+results/*.npz

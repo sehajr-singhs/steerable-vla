@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "steerable-vla"
+version = "0.1.0"
+description = "Steerable VLA — compositional generalization in embodied foundation models via multimodal subgoal prompting and flow-based action execution (miniature study)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.1",
+    "matplotlib>=3.7",
+]
+
+[tool.setuptools]
+packages = ["steerable"]
+package-dir = { "" = "src" }

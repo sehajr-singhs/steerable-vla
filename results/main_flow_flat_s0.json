@@ -1,0 +1,14 @@
+{
+  "variant": "flow_flat",
+  "seed": 0,
+  "n_demos": 8,
+  "epochs": 2,
+  "success": 0.6666666666666666,
+  "ni_success": 0.3333333333333333,
+  "crossings_reduced": 3.6666666666666665,
+  "steps": 73.33333333333333,
+  "jerk": 814.0116972514355,
+  "violations": 20.0,
+  "interventions": 3.0,
+  "n": 3
+}

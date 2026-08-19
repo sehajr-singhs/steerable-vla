@@ -1,0 +1,14 @@
+{
+  "variant": "ours_full",
+  "seed": 0,
+  "n_demos": 12,
+  "epochs": 4,
+  "success": 0.6666666666666666,
+  "ni_success": 0.3333333333333333,
+  "crossings_reduced": 3.6666666666666665,
+  "steps": 41.333333333333336,
+  "jerk": 742.8544016068066,
+  "violations": 0.0,
+  "interventions": 1.5,
+  "n": 6
+}
