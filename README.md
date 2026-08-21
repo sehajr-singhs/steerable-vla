@@ -63,11 +63,21 @@ expert demos → chunk + subgoal → CFM loss / BCE → flow policy
 ## Results
 
 Rendered by `PYTHONPATH=src python scripts/render_results.py` from the
-committed `results/*.json` (the GPU study writes them; the site's
-[study page](docs/study.html) and [index metrics](docs/index.html) read the same
-file). Until the committed study run lands, the tables are pre-registration
-placeholders — the protocol is fixed, the harness is committed, and the numbers
-come from `results/`.
+committed `results/*.json`.
+
+| Variant | NI Success | Violations ↓ | Interventions ↓ |
+|---------|-----------|-------------|----------------|
+| BC (flat MLP) | 0.000 | 21.7 | 1.17 |
+| Flow (no subgoals) | 0.000 | 21.2 | 1.33 |
+| Ours − filter | 0.000 | 19.3 | 1.17 |
+| **Ours (full)** | 0.000 | **0.0** | 1.33 |
+
+**Expert ceiling:** train 100%, held-out zero-shot 83.3% (3 seeds × 30 eps).
+
+**Headline:** the CBF–QP safety filter eliminates workspace violations entirely
+(0 vs 19–22 for baselines). No-intervention success is zero at this scale
+(150 CPU demos) — the GPU study on Kaggle tests whether training scale
+(200 epochs, T4 GPU, flywheel compounding) unlocks the full skill.
 
 ## Reproduce
 
