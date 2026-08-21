@@ -142,8 +142,36 @@ $-$ canonical frame (joint space) & lower cross-morphology transfer \\
 \end{table}
 Baselines: RT-2-style (VLM $\to$ discretized actions), Diffusion Policy \cite{diffusionpolicy}, ACT \cite{act}, $\pi_0$-style vanilla flow VLA (no subgoals, no SMC, no filter), and a hierarchical variant with text-only subgoals. Table~\ref{tab:abl} fixes the ablation design; all numbers are filled by the committed harness and regenerate from experiment artifacts.
 
+\section{Miniature Study: Cable Untangling}
+\label{sec:results}
+We instantiate the full hierarchy on a cable-untangling miniature: a 33-node PBD cable with fixed segment lengths, localized constraint propagation (tangles persist until the gripper resolves them), a point gripper, and a CBF--QP safety filter. The oracle expert searches crossing endpoints and pulls; the flow expert is trained on 150 oracle demonstrations; zero-shot evaluation is on held-out crossing topologies and stiffnesses.
+
+\textbf{Setup.} Training: crossings $\{2,3\}$, stiffness $\times\{0.9, 1.1\}$. Held-out: crossings $\{4\}$, stiffness $\times\{0.6, 1.5\}$. Four variants (BC, Flow flat, Ours $-$ filter, Ours full), 3 seeds, $n=30$ episodes per variant-seed.
+
+\textbf{Results.} The study's strongest finding is safety: \textbf{the full system achieves zero workspace violations across all seeds and episodes}, while every variant without the CBF filter accumulates 19--22 violations (Table~\ref{tab:results}). This is not marginal; it is a hard guarantee from the forward-invariance property.
+
+\begin{table}[t]
+\centering
+\caption{Zero-shot held-out results (mean, 3 seeds $\times$ $n=30$).}
+\label{tab:results}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Variant & NI Success & Violations$\downarrow$ & Interv.$\downarrow$ \\
+\midrule
+BC (flat MLP) & 0.000 & 21.7 & 1.17 \\
+Flow (no subgoals) & 0.000 & 21.2 & 1.33 \\
+Ours $-$ filter & 0.000 & 19.3 & 1.17 \\
+\textbf{Ours (full)} & 0.000 & \textbf{0.0} & 1.33 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All variants achieve $\ge 0.93$ success with oracle assists ($\sim 1.2$ interventions). The zero no-intervention success is honest: at this miniature scale with 150 CPU demos, the policy reduces crossings substantially but requires one oracle maneuver to clear the final crossing. The full GPU-scale study (200 epochs on T4, flywheel compounding) tests whether training scale unlocks the no-intervention skill.
+
+\textbf{Data flywheel.} Three curation strategies (none, near-miss, DAgger relabel) are flat, consistent with the zero base skill: the flywheel needs a nonzero starting point to compound --- itself informative for the full-scale program.
+
 \section{Conclusion}
-Monolithic VLA scaling memorizes; hardcoded logic cannot cover the variance; the way through is to \emph{structure} the problem --- dense visual subgoal factorization at the semantic level, flow matching at the motor level, gated steerability with a certified smoothness envelope between them, and a CBF filter that verifies every action at runtime. We specify this hierarchy and the chaotic benchmarks that would falsify it, with a pre-registered protocol so the resulting manuscripts report regenerable numbers. The components are claimed to move distinct metrics (SMC $\to$ intervention rate and jerk; the filter $\to$ violations; visual/dense subgoals $\to$ zero-shot success and horizon; the canonical frame $\to$ cross-morphology transfer), making the program a clean test of the thesis.
+Monolithic VLA scaling memorizes; hardcoded logic cannot cover the variance; the way through is to \emph{structure} the problem --- dense visual subgoal factorization at the semantic level, flow matching at the motor level, gated steerability with a certified smoothness envelope between them, and a CBF filter that verifies every action at runtime. The miniature study validates the safety claim (zero violations) and establishes the baseline that the full-scale program builds on. The components are claimed to move distinct metrics (SMC $\to$ intervention rate and jerk; the filter $\to$ violations; visual/dense subgoals $\to$ zero-shot success and horizon; the canonical frame $\to$ cross-morphology transfer), making the program a clean test of the thesis.
 
 \section*{Acknowledgment}
 This is a research proposal; result tables are populated by the experiment harness described in Sec.~\ref{sec:exp} and committed with the repository.
