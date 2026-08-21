@@ -1,0 +1,53 @@
+{
+  "main": [
+    {
+      "variant": "bc",
+      "success": 1.0,
+      "ni_success": 0.0,
+      "crossings_reduced": 4.0,
+      "steps": 28.0,
+      "jerk": 487.773,
+      "violations": 21.667,
+      "interventions": 1.167,
+      "n_seeds": 1
+    },
+    {
+      "variant": "flow_flat",
+      "success": 1.0,
+      "ni_success": 0.0,
+      "crossings_reduced": 4.0,
+      "steps": 32.0,
+      "jerk": 538.659,
+      "violations": 21.167,
+      "interventions": 1.333,
+      "n_seeds": 1
+    },
+    {
+      "variant": "ours_nofilter",
+      "success": 1.0,
+      "ni_success": 0.0,
+      "crossings_reduced": 4.0,
+      "steps": 28.0,
+      "jerk": 520.701,
+      "violations": 19.333,
+      "interventions": 1.167,
+      "n_seeds": 1
+    },
+    {
+      "variant": "ours_full",
+      "success": 0.833,
+      "ni_success": 0.0,
+      "crossings_reduced": 3.833,
+      "steps": 40.0,
+      "jerk": 536.641,
+      "violations": 0.0,
+      "interventions": 1.333,
+      "n_seeds": 1
+    }
+  ],
+  "flywheel": null,
+  "expert": {
+    "train": 1.0,
+    "held": 0.833
+  }
+}

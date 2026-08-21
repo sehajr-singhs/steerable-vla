@@ -5,7 +5,6 @@
   "language": "python",
   "kernel_type": "script",
   "is_private": "true",
-  "enable_gpu": "true",
   "accelerator": "GPU",
   "enable_internet": "true",
   "competition_sources": [],

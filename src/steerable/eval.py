@@ -30,8 +30,17 @@ def _subgoal_for(env, obs):
 
 def run_episode(policy, env: CableEnv, max_steps, patience, chunk, steer,
                 use_filter, device, subgoal_fn=None, allow_intervention=True,
-                act_fn=None):
-    """One episode. Returns the metric dict."""
+                act_fn=None, replan=1, refresh_subgoal=True):
+    """One episode. Returns the metric dict.
+
+    receding-horizon execution: the policy emits an action chunk of length
+    `chunk`, but only the first `replan` steps are executed before the
+    policy is re-queried. On every re-query the high-level planner re-issues
+    the subgoal from the current scene state (the steerable conditioning
+    loop of the paper) when refresh_subgoal is True; otherwise the initial
+    subgoal is kept (open-loop conditioning). replan == chunk recovers
+    full open-loop chunk execution.
+    """
     act_fn = act_fn or policy.act
     obs = env._obs()
     subgoal = (subgoal_fn or _subgoal_for)(env, obs)
@@ -47,13 +56,11 @@ def run_episode(policy, env: CableEnv, max_steps, patience, chunk, steer,
         from .safety.cbf import CBFQPFilter
         filter_ = CBFQPFilter(env.cfg)
 
+    horizon = max(1, replan) if replan else chunk
     while not done and steps < max_steps:
         a = act_fn(obs, subgoal, nudge=last_nudge)
         nudge = None if steer is None else np.zeros(3, dtype=np.float32)
-        # execute the FULL action chunk (action-chunking, as in the flow
-        # training distribution): the policy is re-queried only after the
-        # chunk is consumed. Every chunk step still passes the safety filter.
-        for k in range(chunk):
+        for k in range(horizon):
             if done or steps >= max_steps:
                 break
             a0 = a[3 * k: 3 * k + 3]
@@ -82,6 +89,11 @@ def run_episode(policy, env: CableEnv, max_steps, patience, chunk, steer,
                 obs = env._obs()
             if env.zero_streak >= env.cfg.hold_steps:
                 done = True
+        if horizon < chunk and not done:
+            # receding horizon: re-observe and (optionally) re-reason
+            obs = env._obs()
+            if refresh_subgoal:
+                subgoal = (subgoal_fn or _subgoal_for)(env, obs)
 
     success = bool(env.crossings() == 0)
     ni_success = bool(ever_ok or (interventions == 0 and success))
@@ -100,7 +112,7 @@ def run_episode(policy, env: CableEnv, max_steps, patience, chunk, steer,
 
 def evaluate(policy, make_env, n_episodes, seed, dcfg, ecfg, use_filter=True,
              steer=True, device="cpu", subgoal_fn=None, allow_intervention=True,
-             act_fn=None):
+             act_fn=None, refresh_subgoal=True):
     """Evaluate on a held-out family: n_episodes fresh starts, mean metrics."""
     import numpy as np
 
@@ -109,7 +121,9 @@ def evaluate(policy, make_env, n_episodes, seed, dcfg, ecfg, use_filter=True,
         env = make_env(seed=seed * 1000 + k)
         rows.append(run_episode(policy, env, ecfg.max_steps, ecfg.patience,
                                 dcfg.chunk, steer, use_filter, device,
-                                subgoal_fn, allow_intervention, act_fn))
+                                subgoal_fn, allow_intervention, act_fn,
+                                replan=getattr(ecfg, "replan", 1),
+                                refresh_subgoal=refresh_subgoal))
     return {
         "n": len(rows),
         "success": float(np.mean([r["success"] for r in rows])),

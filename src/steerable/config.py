@@ -50,6 +50,7 @@ class EvalConfig:
     max_steps: int = 120
     patience: int = 24             # oracle intervention patience
     hold_ok: int = 12              # steps crossings must stay 0 for success
+    replan: int = 1                # chunk steps executed per re-query (receding horizon)
 
 
 @dataclass
