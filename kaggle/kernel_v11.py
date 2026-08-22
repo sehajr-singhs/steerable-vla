@@ -1,24 +1,27 @@
-"""Steerable VLA — full GPU study with baselines (run on Kaggle GPU).
+"""Steerable VLA — full GPU study v11 (run on Kaggle GPU).
 
-Phases:
-  1. Expert ceiling (oracle)
-  2. Main protocol: BC, ACT, Diffusion, FlowExpert (flat/full) x 3 seeds
-  3. Data flywheel (3 strategies)
+Fixes: ACT/Diffusion baseline shapes, proper GPU detection, complete protocol.
 """
 
 import os, sys, time, json
 
+# ── GPU setup (must be first) ────────────────────────────────────────
 import torch
 print("cuda available:", torch.cuda.is_available(), flush=True)
 if torch.cuda.is_available():
     print("gpu:", torch.cuda.get_device_name(0), flush=True)
     print("gpu memory:", round(torch.cuda.get_device_properties(0).total_mem / 1e9, 1), "GB", flush=True)
+else:
+    print("WARNING: No GPU detected. Will run on CPU.", flush=True)
+    print("If GPU should be available, check Kaggle accelerator settings.", flush=True)
 
+# ── Source path setup ────────────────────────────────────────────────
 SRC = "/kaggle/input/steerable-vla-src"
 print("input dirs:", sorted(os.listdir("/kaggle/input"))[:20], flush=True)
 sys.path.insert(0, SRC)
 sys.path.insert(0, os.path.join(SRC, "src"))
 
+# ── Study config (tuned for 6h GPU budget) ──────────────────────────
 from steerable.config import (EnvConfig, DataConfig, TrainConfig,
                                EvalConfig, FlywheelConfig)
 
@@ -36,12 +39,14 @@ tcfg.n_samples = 8
 ecfg.n_eval = 30
 ecfg.max_steps = 120
 ecfg.patience = 24
+ecfg.replan = 1
 fcfg.iterations = 3
 fcfg.n_deploy = 20
 fcfg.retrain_epochs = 25
 N_DEMOS = 150
 N_SEEDS = 3
 
+# ── Import and run ───────────────────────────────────────────────────
 from steerable.envs.cable import CableEnv
 from steerable.data import collect_demos, build_dataset
 from steerable.policies.flow_expert import make_policy, train_policy
@@ -68,7 +73,8 @@ def dims():
     o = CableEnv(env_cfg).reset().shape[0]
     return o, o, dcfg.chunk * 3
 
-os.makedirs("results", exist_ok=True)
+os.makedirs("/kaggle/working/results", exist_ok=True)
+os.chdir("/kaggle/working")
 t0 = time.time()
 
 # ── Phase 1: Expert ceiling ──────────────────────────────────────────
@@ -91,9 +97,9 @@ with open("results/expert.json", "w") as f:
     json.dump(expert_out, f, indent=2)
 print("expert done", flush=True)
 
-# ── Phase 2: Main protocol (original 4 variants) ────────────────────
+# ── Phase 2a: Main protocol (flow variants) ──────────────────────────
 print("=" * 60, flush=True)
-print("PHASE 2a: Main protocol (4 variants x 3 seeds)", flush=True)
+print("PHASE 2a: Main protocol (4 flow variants x 3 seeds)", flush=True)
 print("=" * 60, flush=True)
 o, s, a = dims()
 variants = ["bc", "flow_flat", "ours_nofilter", "ours_full"]
@@ -107,6 +113,7 @@ for kind in variants:
         print(f"  demos={len(demos)} items={len(dataset)} ({time.time()-t_v0:.0f}s)", flush=True)
 
         policy = make_policy(kind, (o, s, a), tcfg, dcfg)
+        policy = policy.to(DEVICE) if hasattr(policy, 'to') else policy
         train_policy(policy, dataset, tcfg, dcfg, DEVICE, seed=seed, kind=kind)
         print(f"  trained ({time.time()-t_v0:.0f}s)", flush=True)
 
@@ -128,18 +135,17 @@ for kind in variants:
               f"intv={res['interventions']:.1f} vio={res['violations']:.0f} "
               f"({time.time()-t_v0:.0f}s)", flush=True)
 
-# ── Phase 2b: Baseline comparison (ACT + Diffusion) ─────────────────
+# ── Phase 2b: Baseline comparison (ACT, Diffusion) ──────────────────
 print("=" * 60, flush=True)
 print("PHASE 2b: Baseline comparison (ACT, Diffusion)", flush=True)
 print("=" * 60, flush=True)
-import numpy as np
 
-def train_baseline_chunks(demos, dim_obs, dim_action, policy, n_epochs=200, batch_size=128):
+def train_baseline_chunks(demos, dim_obs, policy, n_epochs=200, batch_size=128):
     """Train a baseline policy on action chunks."""
     H = 6
     chunk_obs, chunk_act = [], []
     for d in demos:
-        obs = d["observations"] if "observations" in d else d.get("obs")
+        obs = d["obs"] if "obs" in d else d.get("observations")
         act = d["actions"]
         T = len(act)
         for t in range(max(1, T - H)):
@@ -147,6 +153,7 @@ def train_baseline_chunks(demos, dim_obs, dim_action, policy, n_epochs=200, batc
             chunk_act.append(act[t:t + H])
     obs_t = torch.tensor(np.array(chunk_obs), dtype=torch.float32, device=DEVICE)
     act_t = torch.tensor(np.array(chunk_act), dtype=torch.float32, device=DEVICE)
+    print(f"    chunks: {len(chunk_obs)}, obs {obs_t.shape}, act {act_t.shape}", flush=True)
     for epoch in range(n_epochs):
         perm = torch.randperm(len(obs_t))
         for i in range(0, len(obs_t), batch_size):
@@ -156,6 +163,8 @@ def train_baseline_chunks(demos, dim_obs, dim_action, policy, n_epochs=200, batc
             print(f"    baseline epoch {epoch+1}/{n_epochs}", flush=True)
     return policy
 
+import numpy as np
+
 baseline_variants = ["act", "diffusion"]
 for kind in baseline_variants:
     for seed in range(N_SEEDS):
@@ -164,7 +173,6 @@ for kind in baseline_variants:
         demos = collect_demos(env_cfg, {"make_env": train_fac}, N_DEMOS, seed, dcfg)
         print(f"  demos={len(demos)} ({time.time()-t_v0:.0f}s)", flush=True)
 
-        # Build demo dicts in the baseline format
         demo_dicts = []
         for d in demos:
             demo_dicts.append({"obs": d["obs"], "actions": d["actions"]})
@@ -178,8 +186,7 @@ for kind in baseline_variants:
             bp = DiffusionPolicy(o, dim_action=3, hidden=128)
             bp._denoiser.to(DEVICE)
 
-        train_baseline_chunks(demo_dicts, o, dcfg.chunk * 3, bp,
-                             n_epochs=tcfg.epochs)
+        train_baseline_chunks(demo_dicts, o, bp, n_epochs=tcfg.epochs)
         print(f"  trained ({time.time()-t_v0:.0f}s)", flush=True)
 
         # Evaluate with the standard eval harness (no filter, no steering)
@@ -220,7 +227,8 @@ for strat in ["none", "near_miss", "relabel"]:
 
 # ── Summary ──────────────────────────────────────────────────────────
 meta = {"device": DEVICE, "cuda": torch.cuda.is_available(),
-        "torch": torch.__version__, "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
+        "torch": torch.__version__,
+        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
         "seeds": N_SEEDS, "n_demos": N_DEMOS, "epochs": tcfg.epochs,
         "n_eval": ecfg.n_eval,
         "train_cross": TRAIN_CROSS, "train_stiff": TRAIN_STIFF,

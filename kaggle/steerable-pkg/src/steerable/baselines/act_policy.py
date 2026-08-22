@@ -58,20 +58,25 @@ class ACTPolicy:
     """Action Chunking Transformer policy.
 
     Trained with MSE loss on action chunks. At inference, generates
-    the full chunk in a single forward pass.
+    the full chunk flattened as (H*3,) to match the eval harness.
     """
 
-    def __init__(self, dim_obs: int, dim_action: int, hidden: int = 128, lr: float = 3e-4):
+    ACT_DIM = 3  # per-step action dimension (dx, dy, grab)
+
+    def __init__(self, dim_obs: int, dim_action: int = 3, hidden: int = 128, lr: float = 3e-4):
         self.dim_obs = dim_obs
-        self.dim_action = dim_action
         self._H = 6
-        self._net = _ACTNet(dim_obs, dim_action, H=self._H,
+        # ACT predicts (H, 3) internally, flattened on output
+        self._net = _ACTNet(dim_obs, self.ACT_DIM, H=self._H,
                             d_model=hidden, n_layers=2, n_heads=4)
         self._opt = torch.optim.AdamW(self._net.parameters(), lr=lr, weight_decay=1e-4)
 
     def train_step(self, obs_batch: torch.Tensor, act_batch: torch.Tensor) -> float:
-        """obs: (B, obs_dim), act: (B, T, act_dim) → loss."""
-        target = act_batch[:, :self._H]  # (B, H, act_dim)
+        """obs: (B, obs_dim), act: (B, H, 3) or (B, H*3) → loss."""
+        if act_batch.dim() == 3:
+            target = act_batch[:, :self._H, :self.ACT_DIM]  # (B, H, 3)
+        else:
+            target = act_batch[:, :self._H * self.ACT_DIM].reshape(-1, self._H, self.ACT_DIM)
         pred = self._net(obs_batch)
         loss = nn.functional.mse_loss(pred, target)
         self._opt.zero_grad()
@@ -82,9 +87,10 @@ class ACTPolicy:
 
     @torch.no_grad()
     def act(self, obs: np.ndarray, subgoal: np.ndarray = None) -> np.ndarray:
-        """Return (H, act_dim) action chunk."""
+        """Return flat (H*3,) action chunk for the eval harness."""
         x = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
-        return self._net(x).squeeze(0).numpy().astype(np.float32)
+        # model returns (1, H, 3); flatten to (H*3,)
+        return self._net(x).squeeze(0).reshape(-1).numpy().astype(np.float32)
 
     def state_dict(self):
         return {"net": self._net.state_dict()}

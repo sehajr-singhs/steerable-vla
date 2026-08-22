@@ -87,9 +87,12 @@ class DiffusionPolicy:
         self._alpha_bar = torch.cumprod(self._alphas, dim=0)
 
     def train_step(self, obs_batch: torch.Tensor, act_batch: torch.Tensor) -> float:
-        """obs: (B, obs_dim), act: (B, T, act_dim) → loss."""
+        """obs: (B, obs_dim), act: (B, H, 3) or (B, H*3) → loss."""
         B = obs_batch.shape[0]
-        target = act_batch[:, :self._H].reshape(B, self._total_dim)
+        if act_batch.dim() == 3:
+            target = act_batch[:, :self._H, :self.dim_action].reshape(B, self._total_dim)
+        else:
+            target = act_batch[:, :self._total_dim]
 
         # sample random timestep and noise
         t = torch.randint(0, self._n_train, (B,))
@@ -107,7 +110,7 @@ class DiffusionPolicy:
 
     @torch.no_grad()
     def act(self, obs: np.ndarray, subgoal: np.ndarray = None) -> np.ndarray:
-        """Return (H, act_dim) action chunk via DDPM denoising."""
+        """Return flat (H*3,) action chunk for the eval harness."""
         device = next(self._denoiser.parameters()).device
         obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
 
@@ -123,7 +126,8 @@ class DiffusionPolicy:
             if i < self._n_infer - 1:
                 x += torch.randn_like(x) * (self._betas[i] ** 0.5).to(device)
 
-        return x.reshape(self._H, self.dim_action).cpu().numpy().astype(np.float32)
+        # flatten to (H*3,) for the eval harness
+        return x.reshape(-1).cpu().numpy().astype(np.float32)
 
     def state_dict(self):
         return {"denoiser": self._denoiser.state_dict()}
