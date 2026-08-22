@@ -1,0 +1,13 @@
+{
+  "id": "sehajrsingh/steerable-vla-full-benchmark",
+  "title": "Steerable VLA \u2014 Full Benchmark",
+  "code_file": "kernel.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "accelerator": "GPU",
+  "enable_internet": "true",
+  "dataset_sources": [
+    "sehajrsingh/steerable-vla-src"
+  ]
+}

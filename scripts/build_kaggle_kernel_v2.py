@@ -1,4 +1,32 @@
-"""Steerable VLA — full GPU study with baselines (run on Kaggle GPU).
+#!/usr/bin/env python3
+"""Build + push the Kaggle GPU kernel — v2 with baselines.
+
+Same approach as the v9 kernel that already completed:
+  1. sync() stages src/steerable as a dataset dir
+  2. version_dataset() versions it as sehajrsingh/steerable-vla-src
+  3. push() pushes the kernel
+
+Adds BC, ACT, and Diffusion baseline training alongside the flow variants.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+KAG = os.path.join(ROOT, "kaggle")
+PKG = os.path.join(KAG, "steerable-pkg")
+OUT = os.path.join(ROOT, ".kaggle_output")
+
+KERNEL_ID = "sehajrsingh/steerable-vla-gpu-study"
+KERNEL_TITLE = "steerable-vla-gpu-study"
+DATASET_ID = "sehajrsingh/steerable-vla-src"
+
+KERNEL_PY = r'''"""Steerable VLA — full GPU study with baselines (run on Kaggle GPU).
 
 Phases:
   1. Expert ceiling (oracle)
@@ -236,3 +264,99 @@ for r in rows:
           f"cr={r['crossings_reduced']:.1f} intv={r['interventions']:.1f} "
           f"vio={r['violations']:.0f}", flush=True)
 print("=" * 60, flush=True)
+'''
+
+METADATA = {
+    "id": KERNEL_ID,
+    "title": KERNEL_TITLE,
+    "code_file": "kernel.py",
+    "language": "python",
+    "kernel_type": "script",
+    "is_private": "true",
+    "accelerator": "GPU",
+    "enable_internet": "true",
+    "competition_sources": [],
+    "dataset_sources": [DATASET_ID],
+    "model_sources": [],
+}
+
+
+def run(cmd, **kw):
+    print("+", " ".join(cmd), flush=True)
+    return subprocess.run(cmd, cwd=kw.pop("cwd", ROOT), **kw)
+
+
+def sync():
+    if os.path.exists(PKG):
+        shutil.rmtree(PKG)
+    os.makedirs(os.path.join(PKG, "src"))
+    os.makedirs(os.path.join(PKG, "scripts"))
+    shutil.copytree(os.path.join(ROOT, "src", "steerable"),
+                    os.path.join(PKG, "src", "steerable"))
+    shutil.copy(os.path.join(ROOT, "scripts", "run_experiment.py"),
+                os.path.join(PKG, "scripts", "run_experiment.py"))
+    shutil.copy(os.path.join(ROOT, "requirements.txt"),
+                os.path.join(PKG, "requirements.txt"))
+    with open(os.path.join(PKG, "dataset-metadata.json"), "w") as f:
+        json.dump({"id": DATASET_ID, "title": "Steerable VLA study source",
+                   "licenses": [{"name": "MIT"}]}, f, indent=2)
+    with open(os.path.join(KAG, "kernel.py"), "w") as f:
+        f.write(KERNEL_PY)
+    with open(os.path.join(KAG, "kernel-metadata.json"), "w") as f:
+        json.dump(METADATA, f, indent=2)
+    print("dataset staged at", PKG)
+
+
+def version_dataset():
+    marker = os.path.join(KAG, ".dataset-created")
+    if os.path.exists(marker):
+        cmd = ["kaggle", "datasets", "version", "-p", ".", "--dir-mode", "tar",
+               "-m", "Steerable VLA v5: GPU study with baselines + full protocol"]
+    else:
+        cmd = ["kaggle", "datasets", "create", "-p", ".", "--dir-mode", "tar"]
+    r = run(cmd, cwd=PKG)
+    if r.returncode == 0:
+        with open(marker, "w") as f:
+            f.write(DATASET_ID)
+
+
+def push():
+    run(["kaggle", "kernels", "push", "-p", KAG])
+
+
+def status(ref=KERNEL_ID):
+    p = run(["kaggle", "kernels", "status", ref], capture_output=True, text=True)
+    return p.stdout.strip().split(" has status ")[-1].replace('"', "")
+
+
+def poll(wait=120, timeout=8 * 3600):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        st = status()
+        print(f"  {st}", flush=True)
+        if "COMPLETE" in st or "ERROR" in st or "CANCEL" in st:
+            os.makedirs(OUT, exist_ok=True)
+            run(["kaggle", "kernels", "output", KERNEL_ID, "-p", OUT])
+            return st
+        time.sleep(wait)
+    print(f"timed out after {timeout}s; run --poll again", flush=True)
+    return None
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--push", action="store_true")
+    ap.add_argument("--poll", action="store_true")
+    ap.add_argument("--wait", type=int, default=120)
+    args = ap.parse_args()
+    if args.poll:
+        st = poll(wait=args.wait)
+        sys.exit(0 if st and "COMPLETE" in st else 1)
+    sync()
+    if args.push:
+        version_dataset()
+        push()
+
+
+if __name__ == "__main__":
+    main()
