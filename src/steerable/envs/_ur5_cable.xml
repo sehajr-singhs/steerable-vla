@@ -1,0 +1,76 @@
+<mujoco model="ur5_cable_routing">
+  <option timestep="0.004" gravity="0 0 -9.81" integrator="Euler"
+         solver="CG" iterations="8" tolerance="1e-8">
+    <flag contact="enable" warmstart="enable"/>
+  </option>
+  <default>
+    <geom condim="4" friction="0.8 0.01 0.001"/>
+  </default>
+  <asset>
+    <texture name="texplane" type="2d" builtin="checker" width="512" height="512"
+             rgb1="0.85 0.85 0.85" rgb2="0.75 0.75 0.75"/>
+    <material name="matplane" texture="texplane" texrepeat="8 8" reflectance="0.1"/>
+    <material name="cable" rgba="0.1 0.5 0.9 1"/>
+    <material name="gripper_mat" rgba="0.3 0.3 0.3 1"/>
+    <material name="bead" rgba="0.9 0.2 0.1 1"/>
+    <material name="pin" rgba="0.1 0.1 0.1 1"/>
+  </asset>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="0.5 0.5 0.01" pos="0 0 -0.005"
+          material="matplane"/>
+
+    <!-- gripper (free body) -->
+    <body name="gripper" pos="0 0 0.25">
+      <freejoint name="gripper_joint"/>
+      <geom name="gripper_body" type="cylinder" size="0.018 0.025"
+            material="gripper_mat"/>
+      <geom name="lf" type="box" size="0.004 0.004 0.015" pos="-0.012 0 -0.035"
+            material="gripper_mat"/>
+      <geom name="rf" type="box" size="0.004 0.004 0.015" pos="0.012 0 -0.035"
+            material="gripper_mat"/>
+    </body>
+
+    <!-- left pin (static) -->
+    <body name="pin_L" pos="0 0 0.01" mocap="true">
+      <geom type="sphere" size="0.01" material="pin" contype="0"/>
+    </body>
+
+    <!-- cable beads -->
+    <body name="bead_0" pos="-0.16000 0 0.015">
+      <freejoint name="bead_j_0"/>
+      <geom name="bead_g_0" type="sphere" size="0.0080" material="bead"/>
+    </body>
+    <body name="bead_1" pos="-0.12000 0 0.015">
+      <freejoint name="bead_j_1"/>
+      <geom name="bead_g_1" type="sphere" size="0.0050" material="cable"/>
+    </body>
+    <body name="bead_2" pos="-0.08000 0 0.015">
+      <freejoint name="bead_j_2"/>
+      <geom name="bead_g_2" type="sphere" size="0.0050" material="cable"/>
+    </body>
+    <body name="bead_3" pos="-0.04000 0 0.015">
+      <freejoint name="bead_j_3"/>
+      <geom name="bead_g_3" type="sphere" size="0.0050" material="cable"/>
+    </body>
+    <body name="bead_4" pos="0.00000 0 0.015">
+      <freejoint name="bead_j_4"/>
+      <geom name="bead_g_4" type="sphere" size="0.0080" material="bead"/>
+    </body>
+    <body name="bead_5" pos="0.04000 0 0.015">
+      <freejoint name="bead_j_5"/>
+      <geom name="bead_g_5" type="sphere" size="0.0050" material="cable"/>
+    </body>
+    <body name="bead_6" pos="0.08000 0 0.015">
+      <freejoint name="bead_j_6"/>
+      <geom name="bead_g_6" type="sphere" size="0.0050" material="cable"/>
+    </body>
+    <body name="bead_7" pos="0.12000 0 0.015">
+      <freejoint name="bead_j_7"/>
+      <geom name="bead_g_7" type="sphere" size="0.0050" material="cable"/>
+    </body>
+    <body name="pin_R" pos="0.16000 0 0.01" mocap="true">
+      <geom type="sphere" size="0.01" material="pin" contype="0"/>
+    </body>
+  </worldbody>
+</mujoco>

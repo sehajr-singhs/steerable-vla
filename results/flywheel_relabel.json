@@ -1,0 +1,35 @@
+{
+  "strategy": "relabel",
+  "curve": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "detail": [
+    {
+      "iter": 0,
+      "deployed": 20,
+      "success": 0.0,
+      "n_failures": 20,
+      "curated": 20,
+      "dataset_episodes": 170
+    },
+    {
+      "iter": 1,
+      "deployed": 20,
+      "success": 0.0,
+      "n_failures": 20,
+      "curated": 20,
+      "dataset_episodes": 190
+    },
+    {
+      "iter": 2,
+      "deployed": 20,
+      "success": 0.0,
+      "n_failures": 20,
+      "curated": 20,
+      "dataset_episodes": 210
+    }
+  ],
+  "n_demos0": 150
+}

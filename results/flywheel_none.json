@@ -1,0 +1,35 @@
+{
+  "strategy": "none",
+  "curve": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "detail": [
+    {
+      "iter": 0,
+      "deployed": 20,
+      "success": 0.0,
+      "n_failures": 20,
+      "curated": 0,
+      "dataset_episodes": 150
+    },
+    {
+      "iter": 1,
+      "deployed": 20,
+      "success": 0.0,
+      "n_failures": 20,
+      "curated": 0,
+      "dataset_episodes": 150
+    },
+    {
+      "iter": 2,
+      "deployed": 20,
+      "success": 0.0,
+      "n_failures": 20,
+      "curated": 0,
+      "dataset_episodes": 150
+    }
+  ],
+  "n_demos0": 150
+}

@@ -1,14 +1,14 @@
 {
   "variant": "bc",
   "seed": 0,
-  "n_demos": 30,
-  "epochs": 40,
-  "success": 1.0,
-  "ni_success": 0.0,
-  "crossings_reduced": 4.0,
-  "steps": 28.0,
-  "jerk": 487.7734257168824,
-  "violations": 21.666666666666668,
-  "interventions": 1.1666666666666667,
-  "n": 6
+  "n_demos": 150,
+  "epochs": 200,
+  "success": 0.9,
+  "ni_success": 0.03333333333333333,
+  "crossings_reduced": 3.466666666666667,
+  "steps": 36.0,
+  "jerk": 464.09008902906874,
+  "violations": 32.9,
+  "interventions": 1.3,
+  "n": 30
 }
