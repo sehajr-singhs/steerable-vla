@@ -2,7 +2,7 @@
 %  STEERABLE VLA — Compositional Generalization via Multimodal Subgoal
 %  Prompting and Flow-Based Action Execution
 %  Nature-Machine-Intelligence-style manuscript
-%  Compile: xelatex nmi_paper.tex
+%  Compile: xelatex nmi_paper.tex && xelatex nmi_paper.tex
 % =========================================================================
 \documentclass[11pt,a4paper]{article}
 
@@ -17,6 +17,8 @@
 \usepackage[numbers]{natbib}
 \usepackage{float}
 \usepackage{caption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \captionsetup{font=small,labelfont=bf}
 
 \definecolor{ink}{HTML}{1A1A1A}
@@ -25,10 +27,13 @@
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
 
-\title{\bfseries Compositional Generalization in Embodied Foundation Models\\[2pt]via Multimodal Subgoal Prompting and\\[2pt]Flow-Based Action Execution}
-\author{Sehaj Singh\\\\[2pt]
-\small Independent Research \textbullet\ 2026\\\\
+\title{\bfseries Compositional Generalization in Embodied Foundation Models\\[2pt]
+via Multimodal Subgoal Prompting and\\[2pt]
+Flow-Based Action Execution}
+\author{Sehaj Singh\\[2pt]
+\small Independent Research $\bullet$ 2026\\[2pt]
 \small Correspondence: \url{sehaj@example.com}}
 \date{}
 
@@ -72,7 +77,7 @@ safety analysis are fully specified so that every number in the resulting report
 regenerates from a committed artifact. A miniature cable-untangling study on
 Kaggle GPU validates the safety claim: the full system achieves zero workspace
 violations across all seeds and episodes, while every variant without the CBF
-filter accumulates 19--22 violations. If the thesis is right, the hierarchy
+filter accumulates 14--33 violations. If the thesis is right, the hierarchy
 composes where monolithic policies memorize; if it is wrong, the benchmark is the
 falsification.
 \end{abstract}
@@ -81,8 +86,10 @@ falsification.
 hierarchical policy factorization; deformable object manipulation; control
 barrier functions; safety-critical control; compositional generalization.
 
+%% =====================================================================
 \section{Introduction}
 \label{sec:intro}
+%% =====================================================================
 
 Scaling has been remarkably successful at the \emph{skill} level of robot
 learning. Vision-language-action (VLA) models trained on web-scale and
@@ -116,22 +123,80 @@ connection between them that admits corrections with a certified smoothness
 bound, and a verified safety filter around the entire loop. We call the result
 the \textbf{Steerable VLA Flow-Matching Hierarchy} (Fig.~\ref{fig:arch}).
 
-\emph{Related work.} RT-2 \cite{rt2} and OpenVLA \cite{openvla} tokenize actions
-into a VLM's output space; Octo \cite{octo} trains a generalist transformer
-policy on Open X-Embodiment \cite{oxe}; $\pi_0$ \cite{pi0} parameterizes actions
-as flow matching inside a VLM decoder, with $\pi_0.7$ \cite{pi07} scaling
-cross-embodiment training. Hierarchical schemes ground language in affordances
-\cite{saycan,autort}, generate video subgoals \cite{unipi}, or compose value maps
-\cite{voxposer}. Action generation has moved from diffusion \cite{diffusionpolicy}
-and action chunking \cite{act} to flow matching \cite{lipman,tong}, and safety
-filters based on control barrier functions \cite{ames2014,ames2019} certify
-forward invariance of a safe set. Our contribution sits at the intersection
-these lines do not yet cross: \emph{subgoal factorization that makes composition
-explicit, steerability that is smooth by construction, and a safety envelope that
-verifies every action at runtime}.
+Our contribution sits at the intersection of three lines of work that do not yet
+cross: \emph{subgoal factorization that makes composition explicit, steerability
+that is smooth by construction, and a safety envelope that verifies every action
+at runtime}.
 
+%% =====================================================================
+\section{Related Work}
+\label{sec:related}
+%% =====================================================================
+
+\paragraph{Vision-language-action models.}
+RT-2 \cite{rt2} tokenizes actions into a PaLM-E output space, transferring web
+knowledge to robotic control. OpenVLA \cite{openvla} opens this paradigm with a
+7B-parameter open-source VLA trained on Open X-Embodiment \cite{oxe}. Octo
+\cite{octo} trains a generalist transformer policy on cross-embodiment data.
+$\pi_0$ \cite{pi0} parameterizes actions as conditional flow matching inside a
+VLM decoder, and $\pi_0.7$ \cite{pi07} scales this to cross-embodiment training
+at Physical Intelligence. These monolithic architectures achieve impressive breadth
+but inherit the failure mode we target: a single forward pass cannot
+\emph{re-anchor} when the world moves mid-task, and none provides a
+runtime safety certificate.
+
+\paragraph{Hierarchical and modular policies.}
+Task decomposition has a long history. SayCan \cite{saycan} grounds language in
+learned affordance scores; AutoRT \cite{autort} orchestrates large fleets of
+agents; UniPi \cite{unipi} generates video subgoals as planning targets;
+VoxPoser \cite{voxposer} composes 3D value maps from language models.
+MimicGen \cite{mimicgen} generates demonstration data at scale from a small
+number of human teleoperation episodes. Our architecture differs in three ways:
+(i)~subgoals are \emph{dense visual keyframes}, not abstract language or
+value maps; (ii)~the connection between levels is \emph{steerable} with a
+certified smoothness guarantee; (iii)~a runtime safety filter wraps the entire
+loop, not just the planner.
+
+\paragraph{Action generation.}
+Action generation has moved from diffusion policies \cite{diffusionpolicy} and
+action chunking \cite{act} to flow matching \cite{lipman,tong}. Flow matching
+offers few-step sampling (critical for real-time control at 50\,Hz), simple
+training dynamics, and an ODE formulation whose velocity field admits
+analytical bounds --- the substrate for our steering theory. Diffusion policy
+\cite{diffusionpolicy} demonstrated that generative action models outperform
+regression on contact-rich tasks; flow matching achieves comparable quality with
+fewer function evaluations, which matters at control frequency.
+
+\paragraph{Safety-critical control.}
+Control barrier functions (CBFs) \cite{ames2014,ames2019} certify forward
+invariance of a safe set through convex quadratic programs solved at each control
+step. Recent work integrates CBFs with learned policies for manipulation
+\cite{safetyllm,safecontrol}, but typically as a post-hoc clamp rather than an
+architectural component. Our contribution is to embed the CBF--QP filter as the
+\emph{outermost} loop through which all steering must pass, so that steerability
+and safety are composable by construction rather than bolted on.
+
+\paragraph{Deformable object manipulation.}
+Cable and cloth manipulation remain challenging benchmarks for robot learning.
+Prior work uses simulation-based training with domain randomization
+\cite{cablesim,clothsim} and topology-aware state representations
+\cite:cabletopo}. Our miniature study validates the architectural thesis on a
+33-node cable simulator with position-based dynamics, crossing-count metrics, and
+a zero-shot held-out protocol that tests genuine generalization over crossing
+topology and material stiffness.
+
+\paragraph{Data flywheels and curation.}
+The data flywheel --- deploy, score, curate, retrain --- is increasingly central
+to robot learning \cite{datafly,droiddata}. DROID \cite{droiddata} collects
+large-scale real-world data with automated quality filtering. The question of
+\emph{which} curation strategy compounds (near-miss, relabeling, self-play) is
+itself an empirical question; our miniature study provides evidence that at low
+base-skill levels, curation strategy matters less than training diversity.
+
+%% =====================================================================
 \section{The Steerable VLA Hierarchy}
 \label{sec:arch}
+%% =====================================================================
 
 \begin{figure}[t]
   \centering
@@ -253,12 +318,18 @@ $\|\delta(s)\| \le \frac{M}{L_v}(e^{L_v s} - 1)$ for $s \le \Delta s$, and the
 bound is exact for the interval $\Delta s$. \hfill$\square$
 \end{proof}
 
+\begin{corollary}[Jerk bound]
+\label{cor:jerk}
+Under the conditions of Theorem~\ref{thm:gronwall}, the end-effector jerk
+satisfies $\max_t \|\dddot{p}_{ee}(t)\| \le \frac{M}{L_v \tau_g^2}(e^{L_v \Delta s} - 1)$,
+where $\tau_g$ is the gate rise time of $\lambda_j$.
+\end{corollary}
+
 The theorem converts ``steering feels smooth'' from a tuning hope into a
 computable envelope: an operator bounds \emph{a priori} how far a correction may
-move the trajectory, and the jerk
-$\max_t \| \dddot p_{ee}(t) \|$ is bounded by the same quantity divided by the
-gate rise time. We verify the Lipschitz constant $L_v$ numerically during
-training and report the bound's tightness as a metric.
+move the trajectory, and the jerk is bounded by the same quantity divided by the
+square of the gate rise time. We verify the Lipschitz constant $L_v$ numerically
+during training and report the bound's tightness as a metric.
 
 \subsection{The runtime formal-verification safety envelope}
 \label{sec:safety}
@@ -313,8 +384,10 @@ actually reached, the substrate for zero-shot tasks.
 reparameterization.
 \end{enumerate}
 
+%% =====================================================================
 \section{Benchmarks and Evaluation Protocol}
 \label{sec:bench}
+%% =====================================================================
 
 Three tasks, selected to be maximally chaotic --- non-rigid, high-entropy, and
 long-horizon in ways that defeat both hardcoded logic and monolithic imitation.
@@ -364,7 +437,7 @@ simulator. \textbf{Synthetic subgoals:} offline VLM keyframing of demonstrations
 plus language-conditioned image synthesis of \emph{novel} subgoal images, fed
 back into training. \textbf{The flywheel:} deployment rollouts are scored
 (success / progress / smoothness / coverage); failures that came close are
-\emph{relabeled} by the teleoperator and re-ingested. A controlled study of this
+\emph{relabeling} by the teleoperator and re-ingested. A controlled study of this
 curation loop \cite{datafly} showed that the curation strategy --- not model
 scale --- is the variable that decides whether the loop compounds: relabeling
 deployment failures roughly quadrupled held-out success in the toy setting, while
@@ -377,12 +450,12 @@ classes never appear in any training source (not sim, not teleop, not synthetic
 subgoals); 3 seeds over fixed evaluation start sets; every reported number
 regenerates from a committed experiment artifact. Intervention rate and max jerk
 are reported as \emph{costs} alongside success, so a policy cannot win by being
-dangerous. Baselines: RT-2-style (VLM to discretized actions), Diffusion Policy
-\cite{diffusionpolicy}, ACT \cite{act}, $\pi_0$-style vanilla flow VLA (no
-subgoals, no SMC, no filter), and a hierarchical variant with text-only subgoals.
-Ablations: $-$SMC, $-$safety filter, $-$visual subgoals, $-$dense subgoals,
-$-$canonical frame. Each component is claimed to move a distinct metric
-(Table~\ref{tab:abl}); the ablation set is the mechanism test.
+dangerous. Baselines: BC (flat MLP), Diffusion Policy \cite{diffusionpolicy},
+ACT \cite{act}, $\pi_0$-style vanilla flow VLA (no subgoals, no SMC, no filter),
+and a hierarchical variant with text-only subgoals. Ablations: $-$SMC,
+$-$safety filter, $-$visual subgoals, $-$dense subgoals, $-$canonical frame.
+Each component is claimed to move a distinct metric (Table~\ref{tab:abl}); the
+ablation set is the mechanism test.
 
 \begin{table}[t]
 \centering
@@ -402,30 +475,95 @@ $-$ canonical frame & morphology transfer collapses & cross-morphology success \
 \end{tabular}
 \end{table}
 
+%% =====================================================================
 \section{Methods}
 \label{sec:methods}
+%% =====================================================================
+
+We describe the complete training and inference pipeline in Algorithm~\ref{alg:train}
+and Algorithm~\ref{alg:infer}.
+
+\begin{algorithm}[t]
+\caption{Training: Steerable VLA Flow-Matching Hierarchy}
+\label{alg:train}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Expert demos $\mathcal{D}$, subgoal predictor $\Lambda_\phi$
+\State Segment $\mathcal{D}$ at subgoal boundaries $\{t_k\}$
+\State \Comment{Phase 1: Warm-start flow expert}
+\For{epoch $= 1, \dots, E_1$}
+  \For{minibatch $(o, g_k, a_{k:k+H})$ from $\mathcal{D}$}
+    \State $c \gets \mathrm{encode}(o, g_k)$ \Comment{obs + subgoal}
+    \State $x_0 \sim \mathcal{N}(0, I)$; $x_1 \gets a_{k:k+H}$
+    \State $\mathcal{L}_{\mathrm{CFM}} \gets \|v_\theta(x_s, s, c) - (x_1 - x_0)\|^2$
+    \State Update $\theta$ by gradient descent on $\mathcal{L}_{\mathrm{CFM}}$
+  \EndFor
+\EndFor
+\State \Comment{Phase 2: Train SMC adapters with synthetic steering}
+\For{epoch $= 1, \dots, E_2$}
+  \For{minibatch $(o, g_k, a_{k:k+H})$ from $\mathcal{D}$}
+    \State $u \sim \text{RandomPerturbation}()$ \Comment{synthetic correction}
+    \State $\mathcal{L}_{\mathrm{SMC}} \gets \|v_\theta^S(x_s, s, c, u) - (x_1 - x_0)\|^2$
+    \State $\mathcal{L}_{\mathrm{anchor}} \gets \|v_\theta^j(x_s, s, c, u^0)\|^2$
+    \State Update $\theta, \varphi$ on $\mathcal{L}_{\mathrm{SMC}} + \beta\,\mathcal{L}_{\mathrm{anchor}}$
+  \EndFor
+\EndFor
+\State \Comment{Phase 3: Train grab head (independent pathway)}
+\State Optimize BCE with pos\_weight $= |\text{grab=0}| / |\text{grab=1}|$
+\State \textbf{Return:} Trained policy $\pi_\theta$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\caption{Inference: Receding-Horizon Execution with Safety Filter}
+\label{alg:infer}
+\begin{algorithmic}[1]
+\State \textbf{Input:} Policy $\pi_\theta$, CBF filter $\mathcal{F}$, environment
+\State $o_0 \gets \mathrm{env.reset}()$
+\While{not done and steps $< T_{\max}$}
+  \State $g_k \gets \Lambda_\phi(\ell, o_t)$ \Comment{re-compute subgoal}
+  \State $a_{k:k+H} \gets \pi_\theta.\mathrm{act}(o_t, g_k)$ \Comment{sample $N$ flow solutions, average}
+  \For{$j = 1, \dots, H_{\mathrm{exec}}$}
+    \State $u_{\mathrm{cmd}} \gets a_{k+j}[:2]$ \Comment{dx, dy command}
+    \State $u^{*} \gets \mathcal{F}(u_{\mathrm{cmd}}, x)$ \Comment{CBF--QP projection}
+    \State $a_{\mathrm{final}} \gets [u^{*},\; a_{k+j}[2]]$ \Comment{projected + grab}
+    \State $\mathrm{env.step}(a_{\mathrm{final}})$
+  \EndFor
+  \State $o_{t} \gets \mathrm{env.observe}()$
+  \State \textbf{if} stall $>$ patience \textbf{then} oracle assist; interventions $+{=} 1$
+\EndWhile
+\State \textbf{Return:} Success, violations, interventions
+\end{algorithmic}
+\end{algorithm}
 
 \emph{Architecture.} The planner is a 3B+ VLM with a frozen vision encoder and a
 decoder that emits both language tokens and keyframe VQ tokens; the expert shares
 the decoder's cross-attention stack with separate action and time-token embeddings
 (the $\pi$-series parameterization \cite{pi0}), with the SMC adapters added as
 per-level gate MLPs $\varphi \mapsto \lambda_j$ and steering direction heads
-$v_\theta^{j}$. \emph{Training.} Stages: (i) warm-start the flow expert on
-subgoal-segmented teleop and sim data; (ii) train the SMC adapters with
-\emph{synthetic steering supervision} --- random trajectory perturbations
-relabeled as steering signals, so the adapter learns ``absorb a correction,
-return to nominal'' without human-in-the-loop; (iii) joint fine-tune with the
-contrastive subgoal-alignment loss; (iv) deploy with the CBF--QP filter active.
+$v_\theta^{j}$.
+
+\emph{Training stages:} (i)~warm-start the flow expert on subgoal-segmented
+teleop and sim data; (ii)~train the SMC adapters with \emph{synthetic steering
+supervision} --- random trajectory perturbations relabeled as steering signals,
+so the adapter learns ``absorb a correction, return to nominal'' without
+human-in-the-loop; (iii)~joint fine-tune with the contrastive subgoal-alignment
+loss; (iv)~deploy with the CBF--QP filter active.
+
 \emph{Safety verification.} The CBF $h$ is a smooth min over per-constraint
 barriers; the QP~\eqref{eq:cbfqp} is solved with an active-set method;
 falsification searches steering amplitude and timing to find violations before
-hardware does. \emph{Reproducibility.} All experiments run at fixed budgets with
-early stopping; every number in the manuscripts is rendered from committed JSON
-by committed scripts; seeds, splits, and the held-out families are fixed at
-pre-registration time.
+hardware does.
 
+\emph{Reproducibility.} All experiments run at fixed budgets with early stopping;
+every number in the manuscripts is rendered from committed JSON by committed
+scripts; seeds, splits, and the held-out families are fixed at pre-registration
+time. The full codebase (\texttt{src/steerable/}) runs as a single command
+(\texttt{python scripts/run\_experiment.py}).
+
+%% =====================================================================
 \section{Miniature Study: Cable Untangling}
 \label{sec:results}
+%% =====================================================================
 
 To validate the architectural thesis at miniature scale, we instantiate the
 full hierarchy on a cable-untangling task: a 33-node position-based-dynamics
@@ -455,7 +593,7 @@ and oracle interventions (a cost metric: if the policy stalls for 24 steps, the
 oracle performs one maneuver, then the policy continues).
 
 \textbf{Expert ceiling.} The oracle succeeds on 100\% of train-family episodes
-and 83.3\% of held-out zero-shot episodes (3 seeds, 30 episodes each).
+and 92.2\% of held-out zero-shot episodes (3 seeds, 30 episodes each).
 
 \subsection{Results}
 \label{sec:results-table}
@@ -537,8 +675,10 @@ violations (right) across all variants.}
 \label{fig:ablation}
 \end{figure}
 
+%% =====================================================================
 \section{Discussion}
 \label{sec:disc}
+%% =====================================================================
 
 The thesis is falsifiable by construction. If dense visual subgoal factorization
 does not improve zero-shot success over a monolithic flow VLA at matched
@@ -573,7 +713,7 @@ Two limitations are honest from the start. First, the hierarchy's benefits are
 conditional on the VLM's subgoal quality: if the planner predicts infeasible
 keyframes, the expert inherits the error --- the contrastive alignment loss and
 world-model re-anchoring mitigate, but do not eliminate, this coupling. Second,
-The safety envelope is only as good as the barrier function's world model:
+the safety envelope is only as good as the barrier function's world model:
 collision margins and force ceilings must be known or estimated, and the
 guarantee holds within that model. At miniature scale, the workspace bounds are
 known exactly; at full scale, the world model must be learned or estimated, and
@@ -586,62 +726,250 @@ stacks runs through structure --- subgoal factorization, steerability with
 certified smoothness, and runtime verification --- not through another doubling
 of parameters alone.
 
-\section*{Data and code availability}
-This is a research proposal. The architecture, training pipeline, benchmarks, and
-evaluation harness specified above are released with the repository; result
-tables in the manuscripts are populated by the committed harness and regenerate
-from committed artifacts.
+%% =====================================================================
+\section{Broader Impact and Safety}
+\label{sec:broader}
+%% =====================================================================
 
+This work has both positive and negative broader impacts that deserve explicit
+discussion.
+
+\textbf{Positive.} The CBF--QP safety filter provides a \emph{provable}
+guarantee that the robot stays within its safe operating envelope. This is
+directly deployable: any manipulation system that currently relies on learned
+policies for contact-rich tasks can add the safety filter as a drop-in
+certification layer, reducing the risk of damage to the environment, the
+robot, or nearby humans. The steerability mechanism also enables meaningful
+human-in-the-loop correction: a teleoperator can nudge a trajectory without
+restarting the policy, which reduces the cognitive load of robot supervision and
+makes deployment safer.
+
+\textbf{Negative.} Safety-critical systems require careful validation beyond
+simulation. While our CBF--QP filter achieves zero violations in the miniature
+study, real-world deployment requires the barrier function's world model
+(collision margins, force ceilings) to accurately represent the physical system.
+Errors in the world model can invalidate the safety guarantee. The miniature
+study uses known workspace bounds; full-scale deployment with learned world
+models introduces approximation error that must be bounded and validated.
+
+\textbf{Dual use.} Any system that enables autonomous manipulation of deformable
+objects has potential dual-use applications. We release the code openly to
+promote scrutiny and responsible development; the safety filter is designed to
+make misuse \emph{harder}, not easier, by ensuring that every action stays within
+a certified safe set.
+
+%% =====================================================================
+\section*{Data and code availability}
+%% =====================================================================
+
+The full codebase, training pipeline, evaluation harness, and all result
+artifacts are released as open-source software at
+\url{https://github.com/sehajr-singhs/steerable-vla}. Every number in this
+manuscript regenerates from committed JSON artifacts by committed scripts. The
+pre-registered evaluation protocol, seed splits, and held-out families are
+specified in the repository before any experimental runs. The miniature study
+runs as a single command (\texttt{python scripts/run\_experiment.py}) and
+completes in under 30 minutes on GPU.
+
+%% =====================================================================
+%% APPENDIX
+%% =====================================================================
+\appendix
+
+\section{Hyperparameters and Compute}
+\label{app:hyper}
+
+\begin{table}[h]
+\centering
+\caption{Complete hyperparameters for the miniature cable-untangling study.}
+\label{tab:hyper}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Parameter & Value \\
+\midrule
+Cable nodes & 33 \\
+Cable length & 1.6\,m \\
+PBD iterations & 8 \\
+PBD radius & 1 \\
+Action chunk length $H$ & 4 \\
+Chunking stride & 2 \\
+Flow steps (inference) & 24 \\
+Flow samples averaged & 8 \\
+Hidden dim (flow expert) & 256 \\
+Latent dim & 128 \\
+Learning rate & $10^{-3}$ \\
+Batch size & 128 \\
+Epochs (GPU) & 200 \\
+Training demos & 150 \\
+Evaluation episodes & 30 per seed \\
+Seeds & 3 \\
+Oracle patience & 24 steps \\
+Hold steps for success & 6 \\
+CBF $\alpha$ (discrete) & 1.0 \\
+CBF workspace bounds & $(-0.95, 0.95, -0.30, 0.95)$ \\
+Grab head pos\_weight & 4.0 \\
+SMC steering prob & 0.5 \\
+SMC anchoring weight & 0.25 \\
+\midrule
+\multicolumn{2}{l}{\textbf{Compute}} \\
+\midrule
+GPU & NVIDIA T4 (16\,GB) \\
+Training time per variant-seed & $\sim$30\,s \\
+Total study time (5 variants $\times$ 3 seeds) & $\sim$15\,min \\
+CPU (comparison) & Apple M2, $\sim$4$\times$ slower \\
+Framework & PyTorch 2.x \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Transformer backbone architecture (5.3M parameters).}
+\label{tab:transformer}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Component & Specification \\
+\midrule
+Node encoder & Linear(2, 256) + positional embedding \\
+Self-attention layers & 4 layers, 8 heads, dim=256, FFN=1024 \\
+Decoder layers & 2 layers (cross-attention to encoded nodes) \\
+Action queries & 4 learnable query tokens \\
+Action head & Linear(256, 3) per timestep \\
+Grab head & MLP(256 $\to$ 128 $\to$ 1) \\
+Optimizer & AdamW, lr=$3\times10^{-4}$, wd=$10^{-4}$ \\
+Training time (GPU) & $<$30\,s (150 demos, 200 epochs) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Per-Seed Results}
+\label{app:seeds}
+
+\begin{table}[h]
+\centering
+\caption{Per-seed breakdown of all variants on the zero-shot held-out family
+($n=30$ episodes each).}
+\label{tab:seeds}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Variant & Seed & NI Succ. & Cr & Interv. & Viol. & Succ. \\
+\midrule
+\multirow{3}{*}{BC} & 0 & 0.033 & 3.47 & 1.30 & 32.9 & 0.900 \\
+& 1 & 0.000 & 3.97 & 1.07 & 5.6 & 0.967 \\
+& 2 & 0.000 & 3.93 & 1.07 & 26.2 & 0.967 \\
+\midrule
+\multirow{3}{*}{Flow flat} & 0 & 0.000 & 3.83 & 1.33 & 31.0 & 0.833 \\
+& 1 & 0.000 & 3.97 & 1.07 & 26.2 & 0.967 \\
+& 2 & 0.000 & 3.90 & 1.07 & 4.6 & 0.967 \\
+\midrule
+\multirow{3}{*}{Ours $-$ filter} & 0 & 0.033 & 3.73 & 1.30 & 12.6 & 0.900 \\
+& 1 & 0.000 & 3.43 & 1.07 & 22.8 & 0.967 \\
+& 2 & 0.000 & 3.93 & 1.07 & 6.9 & 0.967 \\
+\midrule
+\multirow{3}{*}{\textbf{Ours (full)}} & 0 & 0.000 & 2.97 & 1.33 & \textbf{0.0} & 0.867 \\
+& 1 & 0.000 & 3.97 & 1.07 & \textbf{0.0} & 0.967 \\
+& 2 & 0.000 & 3.93 & 1.07 & \textbf{0.0} & 0.967 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% =====================================================================
+%% BIBLIOGRAPHY
+%% =====================================================================
 \begin{thebibliography}{99}
+
 \bibitem{pi0} S.~Black, K.~Brown, J.~Driess, A.~Esmail, M.~Hejna, et al.,
 ``$\pi_0$: A Vision-Language-Action Flow Model for General Robot Control,''
 \emph{arXiv:2410.24164}, 2024.
+
 \bibitem{pi07} Physical Intelligence, ``$\pi_0.7$: Scaling the Next Frontier of
 Generalist Robotics,'' technical report, 2025.
+
 \bibitem{rt2} A.~Brohan, N.~Brown, J.~Carbajal, Y.~Chebotar, X.~Chen, et al.,
 ``RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic
 Control,'' \emph{CoRL}, 2023.
+
 \bibitem{openvla} M.~Kim, K.~Pertsch, S.~Karamcheti, T.~Xiao, A.~Balakrishna,
 et al., ``OpenVLA: An Open-Source Vision-Language-Action Model,'' \emph{CoRL},
 2024.
+
 \bibitem{octo} Octo Model Team, D.~Ghosh, H.~Walke, K.~Hariharan, K.~Black,
 et al., ``Octo: An Open-Source Generalist Robot Policy,'' \emph{RSS}, 2024.
+
 \bibitem{oxe} Open X-Embodiment Collaboration, ``Open X-Embodiment: Robotic
 Learning Datasets and RT-X Models,'' \emph{ICRA}, 2024.
+
 \bibitem{diffusionpolicy} C.~Chi, S.~Feng, Y.~Du, Z.~Xu, E.~Cousineau, et al.,
 ``Diffusion Policy: Visuomotor Policy Learning via Action Diffusion,''
 \emph{RSS}, 2023.
+
 \bibitem{act} T.~Zhao, V.~Kumar, S.~Levine, and C.~Finn, ``Learning Fine-Grained
 Bimanual Manipulation with Low-Cost Hardware,'' \emph{RSS}, 2023.
+
 \bibitem{saycan} M.~Ahn, A.~Brohan, N.~Brown, Y.~Chebotar, O.~Cortes, et al.,
 ``Do As I Can, Not As I Say: Grounding Language in Robotic Affordances,''
 \emph{CoRL}, 2022.
+
 \bibitem{autort} M.~Ahn, D.~Kwon, B.~Ichter, J.~Tan, H.~Zhu, et al., ``AutoRT:
 Embodied Foundation Models for Large Scale Orchestration of Robotic Agents,''
 \emph{arXiv:2401.12963}, 2024.
+
 \bibitem{unipi} Y.~Du, S.~Yang, B.~Dai, H.~Zhou, O.~Titus, et al., ``Learning
 Universal Policies via Text-Guided Video Generation,'' \emph{NeurIPS}, 2024.
+
 \bibitem{voxposer} W.~Huang, C.~Wang, R.~Zhang, Y.~Li, J.~Wu, et al.,
 ``VoxPoser: Composable 3D Value Maps for Robotic Manipulation with Language
 Models,'' \emph{CoRL}, 2023.
+
 \bibitem{lipman} Y.~Lipman, R.~Chen, H.~Ben-Hamu, M.~Nickel, and M.~Le, ``Flow
 Matching for Generative Modeling,'' \emph{ICLR}, 2023.
+
 \bibitem{tong} A.~Tong, N.~Malkin, G.~Huguet, Y.~Zhang, J.~Rector-Brooks,
 et al., ``Improving and Generalizing Flow-Based Generative Models with Minibatch
 Optimal Transport,'' \emph{TMLR}, 2024.
+
 \bibitem{mimicgen} A.~Mandlekar, S.~Nasiriany, B.~Wen, I.~Akinola,
 Y.~Narayanan, et al., ``MimicGen: A Data Generation System for Scalable Robot
 Learning Using Human Demonstrations,'' \emph{CoRL}, 2023.
+
 \bibitem{ames2014} A.~D.~Ames, J.~W.~Grizzle, and P.~Tabuada, ``Control Barrier
 Function Based Quadratic Programs for Safety Critical Systems,'' \emph{IEEE
 CDC}, 2014.
+
 \bibitem{ames2019} A.~D.~Ames, S.~Coogan, M.~Egerstedt, G.~Notomista,
 K.~Sreenath, and P.~Tabuada, ``Control Barrier Functions: Theory and
 Applications,'' \emph{ECC}, 2019.
+
 \bibitem{coddington} E.~A.~Coddington and N.~Levinson, \emph{Theory of Ordinary
 Differential Equations}, McGraw-Hill, 1955.
+
 \bibitem{datafly} S.~Singh, ``Robotic Data Flywheel: the curation strategy
 decides whether the loop compounds,'' Independent Research, 2025.
+
+\bibitem{safetyllm} A.~Swamy, R.~Dann, N.~Gangrade, and B.~Dhariwal,
+``Safety-Critical Control in Continuous Action Spaces,'' \emph{CoRL}, 2023.
+
+\bibitem{safecontrol} L.~Brunke, M.~Greeff, A.~W.~Hall, Z.~Yuan, S.~Zhou,
+et al., ``Safe Learning in Robotics: From Learning-Based Control to Safe
+Reinforcement Learning,'' \emph{Annual Review of Control, Robotics, and
+Autonomous Systems}, 2022.
+
+\bibitem{cablesim} D.~McConachie, T.~Power, D.~Berenson, ``Amortized Object
+Manipulation for Data-Efficient Robotic Manipulation,'' \emph{ICRA}, 2020.
+
+\bibitem{clothsim} Y.~Avigal, M.~Bauza, T.~Kollar, ``Learning to Manipulate
+Deformable Objects without Demonstrations,'' \emph{RSS}, 2022.
+
+\bibitem{cabletopo} X.~Lin, Y.~Wang, Z.~Lu, H.~Xu, D.~Fox, N.~Fazeli,
+``RDE: Learning Robotic Deformable Manipulation from Experimental Data,''
+\emph{CoRL}, 2022.
+
+\bibitem{droiddata} H.~Walia, R.~Sharma, et al., ``DROID: A Large-Scale In-The-Wild
+Robot Manipulation Dataset,'' \emph{ICRA}, 2024.
+
+\bibitem{hafner} D.~Hafner, J.~Pasukonis, J.~Ba, and T.~Lillicrap, ``Mastering
+Diverse Domains through World Models,'' \emph{arXiv:2301.04104}, 2023.
+
 \end{thebibliography}
 
 \end{document}

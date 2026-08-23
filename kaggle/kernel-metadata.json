@@ -6,6 +6,5 @@
   "kernel_type": "script",
   "is_private": true,
   "enable_gpu": true,
-  "enable_internet": true,
-  "dataset_sources": ["sehajrsingh/steerable-vla-src"]
+  "enable_internet": true
 }
