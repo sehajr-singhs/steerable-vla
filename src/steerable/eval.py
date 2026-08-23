@@ -56,7 +56,9 @@ def run_episode(policy, env: CableEnv, max_steps, patience, chunk, steer,
         from .safety.cbf import CBFQPFilter
         filter_ = CBFQPFilter(env.cfg)
 
-    horizon = max(1, replan) if replan else chunk
+    # replan=0 means execute the full chunk before re-querying.
+    # replan=K means execute K steps then re-query (receding horizon).
+    horizon = chunk if (replan is None or replan <= 0) else min(replan, chunk)
     while not done and steps < max_steps:
         a = act_fn(obs, subgoal, nudge=last_nudge)
         nudge = None if steer is None else np.zeros(3, dtype=np.float32)

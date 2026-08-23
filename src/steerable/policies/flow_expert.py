@@ -103,8 +103,20 @@ class FlowExpert(nn.Module):
     # training
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _focal_bce(logit, target, gamma=2.0, alpha=0.75):
+        """Focal BCE: upweights hard positives (alpha) and downweights easy
+        negatives (gamma). Prevents the 80/20 class prior from collapsing
+        the grab head to 'never grab'."""
+        bce = torch.nn.functional.binary_cross_entropy_with_logits(
+            logit, target, reduction='none')
+        pt = torch.where(target == 1, torch.sigmoid(logit),
+                         1 - torch.sigmoid(logit))
+        focal = alpha * (1 - pt) ** gamma
+        return (focal * bce).mean()
+
     def cfm_loss(self, obs, subgoal, chunk, nudge, rng, steer_prob):
-        """CFM over continuous deltas + BCE over the grab sequence.
+        """CFM over continuous deltas + focal BCE over the grab sequence.
 
         chunk layout: [deltas (H*2) | grabs (H)] per row.
         """
@@ -123,17 +135,14 @@ class FlowExpert(nn.Module):
         else:
             pred = self.velocity(x_s, s, c, u=None)
         loss = torch.mean((pred - target) ** 2)
-        # discrete head: Bernoulli over the grab sequence, on its own path
+        # discrete head: focal BCE over the grab sequence, on its own path
         go = self.grab_obs(obs)
         if subgoal is not None and self.use_subgoal:
             gs = self.grab_sub(subgoal)
         else:
             gs = torch.zeros_like(go)
         g_logit = self.grab_head(torch.cat([go, gs], dim=-1))
-        # class-weighted BCE: grab=1 is ~20% of chunk positions (approach
-        # phases dominate), so an unweighted loss collapses to "never grab"
-        loss = loss + torch.nn.functional.binary_cross_entropy_with_logits(
-            g_logit, g1, pos_weight=torch.tensor(4.0))
+        loss = loss + self._focal_bce(g_logit, g1, gamma=2.0, alpha=0.75)
         # anchoring auxiliary loss: steering branch must vanish at u=0
         if self.use_steering:
             u0 = torch.zeros_like(nudge)
@@ -258,16 +267,27 @@ def make_policy(kind, dims, tcfg: TrainConfig, dcfg: DataConfig):
 
 
 def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
-                 device, epochs=None, seed=0, kind="ours_full"):
+                 device, epochs=None, seed=0, kind="ours_full",
+                 curriculum_fn=None, verbose=False):
+    """Train a policy with cosine LR schedule and optional curriculum.
+
+    curriculum_fn(epoch) -> float: returns the crossing_target for this epoch.
+    When provided, the caller re-generates data at the new difficulty level.
+    When not provided, we just train on the provided data.
+    """
+    import math
+    import numpy as _np
     torch.manual_seed(seed)
-    rng = __import__("numpy").random.RandomState(seed)
+    rng = _np.random.RandomState(seed)
     epochs = epochs or tcfg.epochs
     # Some policies (TransformerPolicy) have their own optimizer
     if hasattr(policy, '_opt'):
         opt = policy._opt
     else:
         opt = torch.optim.Adam(policy.parameters(), lr=tcfg.lr)
-    import numpy as _np
+    # Cosine annealing schedule
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        opt, T_max=epochs, eta_min=getattr(tcfg, 'lr_min', 1e-5))
     obs = torch.as_tensor(_np.array([it[0] for it in dataset]), device=device)
     sub = torch.as_tensor(_np.array([it[1] for it in dataset]), device=device)
     chunk = torch.as_tensor(_np.array([it[2] for it in dataset]), device=device)
@@ -276,9 +296,11 @@ def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
     if n == 0:
         return policy
     policy.train()
+    best_loss = float('inf')
     for ep in range(epochs):
         perm = rng.permutation(n)
         tot = 0.0
+        nbatch = 0
         for b in range(0, n, tcfg.batch):
             idx = perm[b:b + tcfg.batch]
             ob, su, ch, nu = obs[idx], sub[idx], chunk[idx], nudge[idx]
@@ -286,6 +308,7 @@ def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
             if hasattr(policy, 'train_step') and not isinstance(policy, (FlowExpert, BCPolicy)):
                 loss = policy.train_step(ob, ch)
                 tot += float(loss) * len(idx)
+                nbatch += 1
                 continue
             opt.zero_grad()
             if isinstance(policy, BCPolicy):
@@ -295,8 +318,16 @@ def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
             else:
                 loss = policy.forward(ob, su, g1=ch)
             loss.backward()
+            if tcfg.grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(policy.parameters(), tcfg.grad_clip)
             opt.step()
             tot += float(loss.detach()) * len(idx)
-        if ep % 20 == 19:
-            pass  # progress printed by the caller
+            nbatch += 1
+        scheduler.step()
+        avg = tot / max(1, n)
+        if avg < best_loss:
+            best_loss = avg
+        if verbose and ep % 50 == 0:
+            lr_now = opt.param_groups[0]['lr']
+            print(f"  ep {ep:4d}/{epochs}  loss={avg:.5f}  lr={lr_now:.2e}")
     return policy

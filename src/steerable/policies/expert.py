@@ -78,8 +78,10 @@ def run_expert(env, max_steps=250, record=False):
         actions.append([float(a[0]), float(a[1]), float(a[2])])
         obs.append(env._obs().copy())
 
-    def rollback(snap_x, n_actions):
+    def rollback(snap_x, snap_gripper, n_actions):
         env.x[:] = snap_x
+        env.gripper = snap_gripper.copy()
+        env.holding = None
         del actions[n_actions:]
         del obs[n_actions + 1:]
 
@@ -118,7 +120,8 @@ def run_expert(env, max_steps=250, record=False):
                      np.array([1.0, -1.0]) / np.sqrt(2),
                      np.array([-1.0, -1.0]) / np.sqrt(2)]
         dirs = []
-        for idx in (j, j + 1):
+        # Try BOTH segments of the crossing (not just the return strand)
+        for idx in (i, i + 1, j, j + 1):
             if not (0 < idx < len(env.x) - 1) or not _reachable(env, env.x[idx]):
                 continue
             pos = env.x[idx]
@@ -136,6 +139,7 @@ def run_expert(env, max_steps=250, record=False):
             if cleared:
                 break
             snap_x = env.x.copy()
+            snap_gripper = env.gripper.copy()
             n_actions = len(actions)
             node_pos = _clamp(env, env.x[node])
             # teleport the gripper to the node (recorded as a single move)
@@ -157,12 +161,15 @@ def run_expert(env, max_steps=250, record=False):
                 act([step_vec[0], step_vec[1], 1.0])
             act([0.0, 0.0, 0.0])           # release
             if not cleared:
-                rollback(snap_x, n_actions)
+                rollback(snap_x, snap_gripper, n_actions)
 
         if not cleared:
             failed.add((round(p[0], 1), round(p[1], 1)))
         after = env.crossings()
         if after < cr:
+            # Crossings decreased: clear failed set so remaining crossings
+            # get fresh retry attempts (the cable reconfigured).
+            failed.clear()
             milestones.append(env.snapshot())
         crossing_hist.append(after)
         if len(actions) >= max_steps or sim >= SIM_BUDGET:

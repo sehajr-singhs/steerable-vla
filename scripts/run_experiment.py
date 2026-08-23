@@ -56,17 +56,60 @@ def make_env_factory(env_cfg, cross_list, stiff_list):
 
 def dims(env_cfg):
     o = CableEnv(env_cfg).reset().shape[0]
-    return o, o, DataConfig().chunk * 3   # (dim_obs, dim_sub, dim_action)
+    return o, o, DataConfig().chunk * 3   # (dim_obs, dim_sub, dim_action)def run_variant(kind, env_cfg, dcfg, tcfg, ecfg, seed, n_demos, epochs, device):
+    """Train and evaluate a variant with optional curriculum learning.
 
-
-def run_variant(kind, env_cfg, dcfg, tcfg, ecfg, seed, n_demos, epochs, device):
-    train_env = make_env_factory(env_cfg, TRAIN_CROSS, TRAIN_STIFF)
-    demos = collect_demos(env_cfg, {"make_env": train_env}, n_demos, seed, dcfg)
-    dataset = build_dataset(demos, dcfg, seed=seed)
+    Curriculum: start training on easy configs (1 crossing, mild stiffness)
+    and ramp to full difficulty. This gives the grab head and velocity field
+    a chance to learn the basic approach-grab-pull maneuver before tackling
+    complex topologies.
+    """
     o, s, a = dims(env_cfg)
     policy = make_policy(kind, (o, s, a), tcfg, dcfg)
-    train_policy(policy, dataset, tcfg, dcfg, device, seed=seed, kind=kind,
-                 epochs=epochs)
+
+    if tcfg.curriculum:
+        # Phase 1: easy configs (1 crossing, stiff=1.0) — learn the basic maneuver
+        easy_cross = [1]
+        easy_stiff = [1.0]
+        easy_env = make_env_factory(env_cfg, easy_cross, easy_stiff)
+        demos_easy = collect_demos(env_cfg, {"make_env": easy_env},
+                                   min(n_demos, 80), seed, dcfg)
+        data_easy = build_dataset(demos_easy, dcfg, seed=seed)
+        print(f"  curriculum phase 1: {len(data_easy)} items, 1-crossing")
+        if len(data_easy) > 0:
+            train_policy(policy, data_easy, tcfg, dcfg, device, seed=seed,
+                         kind=kind, epochs=min(epochs // 3, 150),
+                         verbose=True)
+
+        # Phase 2: medium configs (2 crossings) — learn multi-crossing
+        med_cross = [2]
+        med_env = make_env_factory(env_cfg, med_cross, TRAIN_STIFF)
+        demos_med = collect_demos(env_cfg, {"make_env": med_env},
+                                  min(n_demos, 100), seed + 100, dcfg)
+        data_med = build_dataset(demos_med, dcfg, seed=seed)
+        print(f"  curriculum phase 2: {len(data_med)} items, 2-crossing")
+        if len(data_med) > 0:
+            train_policy(policy, data_med, tcfg, dcfg, device, seed=seed,
+                         kind=kind, epochs=min(epochs // 3, 150),
+                         verbose=True)
+
+        # Phase 3: full difficulty (2-3 crossings) — the real training
+        full_env = make_env_factory(env_cfg, TRAIN_CROSS, TRAIN_STIFF)
+        demos_full = collect_demos(env_cfg, {"make_env": full_env},
+                                   n_demos, seed + 200, dcfg)
+        data_full = build_dataset(demos_full, dcfg, seed=seed)
+        print(f"  curriculum phase 3: {len(data_full)} items, 2-3 crossing")
+        if len(data_full) > 0:
+            train_policy(policy, data_full, tcfg, dcfg, device, seed=seed,
+                         kind=kind, epochs=epochs // 3, verbose=True)
+    else:
+        # No curriculum: standard training
+        train_env = make_env_factory(env_cfg, TRAIN_CROSS, TRAIN_STIFF)
+        demos = collect_demos(env_cfg, {"make_env": train_env}, n_demos, seed, dcfg)
+        dataset = build_dataset(demos, dcfg, seed=seed)
+        train_policy(policy, dataset, tcfg, dcfg, device, seed=seed, kind=kind,
+                     epochs=epochs, verbose=True)
+
     # zero-shot eval on held-out families
     held = make_env_factory(env_cfg, EVAL_CROSS, EVAL_STIFF)
     use_filter = kind == "ours_full"
@@ -78,8 +121,7 @@ def run_variant(kind, env_cfg, dcfg, tcfg, ecfg, seed, n_demos, epochs, device):
             "ni_success": res["ni_success"],
             "crossings_reduced": res["crossings_reduced"],
             "steps": res["steps"], "jerk": res["jerk"],
-            "violations": res["violations"],
-            "interventions": res["interventions"], "n": res["n"]}
+            "violations": res["violations"], "interventions": res["interventions"], "n": res["n"]}
 
 
 def run_expert_ceiling(env_cfg, ecfg, seeds=3):

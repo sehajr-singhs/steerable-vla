@@ -34,23 +34,27 @@ class DataConfig:
 
 @dataclass
 class TrainConfig:
-    epochs: int = 120
-    batch: int = 128
-    lr: float = 1e-3
-    hidden: int = 256
-    latent: int = 128
+    epochs: int = 500
+    batch: int = 64
+    lr: float = 3e-4
+    lr_min: float = 1e-5          # cosine schedule floor
+    hidden: int = 512
+    latent: int = 256
     flow_steps: int = 24           # Euler steps at inference
     n_samples: int = 8             # flow samples averaged at inference
+    grad_clip: float = 1.0
+    curriculum: bool = True        # ramp crossing_target from 1 to cfg value
+    curriculum_warmup: int = 50    # epochs before crossing_target increases
     seed: int = 0
 
 
 @dataclass
 class EvalConfig:
-    n_eval: int = 60
-    max_steps: int = 120
-    patience: int = 24             # oracle intervention patience
-    hold_ok: int = 12              # steps crossings must stay 0 for success
-    replan: int = 1                # chunk steps executed per re-query (receding horizon)
+    n_eval: int = 30
+    max_steps: int = 200
+    patience: int = 30             # oracle intervention patience
+    hold_ok: int = 6               # steps crossings must stay 0 for success
+    replan: int = 0                # 0=full chunk, K=K steps per re-query (receding horizon)
 
 
 @dataclass
