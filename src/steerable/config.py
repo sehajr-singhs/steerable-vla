@@ -13,8 +13,8 @@ class EnvConfig:
     friction: float = 0.25
     gravity: float = 0.12
     dt: float = 0.02
-    pbd_iters: int = 8             # position-based dynamics iterations per step
-    pbd_radius: int = 1            # constraint-localization radius around the held node
+    pbd_iters: int = 12            # position-based dynamics iterations per step
+    pbd_radius: int = 3            # constraint-localization radius around the held node
     grab_radius: float = 0.16
     force_max: float = 30.0        # gripper holding force cap (slip -> violation)
     v_gripper: float = 0.22        # gripper velocity cap per action step

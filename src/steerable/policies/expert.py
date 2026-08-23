@@ -120,15 +120,23 @@ def run_expert(env, max_steps=250, record=False):
                      np.array([1.0, -1.0]) / np.sqrt(2),
                      np.array([-1.0, -1.0]) / np.sqrt(2)]
         dirs = []
-        # Try BOTH segments of the crossing (not just the return strand)
-        for idx in (i, i + 1, j, j + 1):
-            if not (0 < idx < len(env.x) - 1) or not _reachable(env, env.x[idx]):
+        # Try ALL non-pinned nodes, not just crossing segments.
+        # After clearing one crossing, the remaining crossing's nodes
+        # may not be on the detected crossing segments.
+        for idx in range(1, len(env.x) - 1):
+            if not _reachable(env, env.x[idx]):
                 continue
             pos = env.x[idx]
             toward = np.asarray(p, dtype=float) - pos
             nrm = np.linalg.norm(toward)
             toward = toward / nrm if nrm > 1e-6 else np.array([0.0, 1.0])
-            dirs.extend((idx, d) for d in [toward, -toward] + base_dirs)
+            # Prioritize nodes near the crossing
+            dist_to_cross = np.linalg.norm(pos - np.asarray(p))
+            priority = -dist_to_cross  # closer = higher priority
+            dirs.extend((idx, d, priority) for d in [toward, -toward] + base_dirs)
+        # Sort by priority (closest to crossing first)
+        dirs.sort(key=lambda x: -x[2])
+        dirs = [(idx, d) for idx, d, _ in dirs]
         if not dirs:
             failed.add((round(p[0], 1), round(p[1], 1)))
             continue
@@ -146,8 +154,8 @@ def run_expert(env, max_steps=250, record=False):
             step_vec = _clamp(env, node_pos) - env.gripper
             act([step_vec[0], step_vec[1], 0.0])
             act([0.0, 0.0, 1.0])          # grab
-            target = _clamp(env, node_pos + cand * 0.5)
-            for _ in range(8):
+            target = _clamp(env, node_pos + cand * 0.6)
+            for _ in range(12):
                 if env.crossings() < cr:
                     cleared = True
                     break
