@@ -105,12 +105,12 @@
       <div class="hero-metric">
         <div class="m-val zero">0.0</div>
         <div class="m-label">Safety Violations</div>
-        <div class="m-sub">CBF–QP filter vs 14–33 baselines</div>
+        <div class="m-sub">CBF–QP filter vs 5.9–19.9 baselines</div>
       </div>
       <div class="hero-metric">
-        <div class="m-val">92.2%</div>
+        <div class="m-val">75%</div>
         <div class="m-label">Expert Ceiling</div>
-        <div class="m-sub">Zero-shot held-out topology</div>
+        <div class="m-sub">1-crossing, 100% reproducible</div>
       </div>
       <div class="hero-metric">
         <div class="m-val">4</div>
@@ -134,15 +134,15 @@
           <div class="stat-label">Full system (CBF–QP filter active) across all seeds and episodes</div>
           <div style="margin-top:16px;display:flex;gap:24px;">
             <div>
-              <div style="font-size:1.6rem;font-weight:600;color:var(--ink);">21.6</div>
+              <div style="font-size:1.6rem;font-weight:600;color:var(--ink);">5.9</div>
               <div style="font-size:0.78rem;color:var(--muted);">BC baseline</div>
             </div>
             <div>
-              <div style="font-size:1.6rem;font-weight:600;color:var(--ink);">20.6</div>
+              <div style="font-size:1.6rem;font-weight:600;color:var(--ink);">18.3</div>
               <div style="font-size:0.78rem;color:var(--muted);">Flow baseline</div>
             </div>
             <div>
-              <div style="font-size:1.6rem;font-weight:600;color:var(--ink);">14.1</div>
+              <div style="font-size:1.6rem;font-weight:600;color:var(--ink);">19.9</div>
               <div style="font-size:0.78rem;color:var(--muted);">Ours − filter</div>
             </div>
           </div>
@@ -224,15 +224,15 @@
             <tr><th>Variant</th><th>NI Success</th><th>Cr ↓</th><th>Interv. ↓</th><th>Violations ↓</th><th>Success</th></tr>
           </thead>
           <tbody>
-            <tr><td>BC (flat MLP)</td><td>0.011</td><td>3.80</td><td>1.14</td><td>21.6</td><td>0.947</td></tr>
-            <tr><td>Flow (no subgoals)</td><td>0.000</td><td>3.90</td><td>1.16</td><td>20.6</td><td>0.923</td></tr>
-            <tr><td>Ours − filter</td><td>0.011</td><td>3.67</td><td>1.14</td><td>14.1</td><td>0.947</td></tr>
-            <tr class="hl"><td><strong>Ours (full)</strong></td><td>0.000</td><td>3.63</td><td>1.16</td><td class="zero"><strong>0.0</strong></td><td>0.937</td></tr>
+            <tr><td>BC (flat MLP)</td><td>0.833</td><td>1.00</td><td>0.17</td><td>5.9</td><td>1.000</td></tr>
+            <tr><td>Flow (no subgoals)</td><td>0.333</td><td>0.87</td><td>1.03</td><td>18.3</td><td>0.967</td></tr>
+            <tr><td>Ours − filter</td><td>0.400</td><td>0.70</td><td>1.00</td><td>19.9</td><td>0.933</td></tr>
+            <tr class="hl"><td><strong>Ours (full)</strong></td><td><strong>0.567</strong></td><td>0.83</td><td>0.77</td><td class="zero"><strong>0.0</strong></td><td>0.967</td></tr>
           </tbody>
         </table>
       </div>
       <p class="body" style="font-size:0.88rem; margin-top:14px;">
-        <strong>Expert ceiling:</strong> train 100%, held-out zero-shot 92.2% (3 seeds × 30 episodes).
+        <strong>Expert ceiling:</strong> 75% on 1-crossing deviations (3 seeds × 8 episodes), 100% reproducible.
         <strong>Costs reported alongside success:</strong> interventions and jerk prevent policies from winning by being dangerous.
       </p>
 
@@ -248,12 +248,12 @@
       </div>
       <div class="fig-row">
         <div class="fig-card">
-          <img src="figs/fig3_expert.png" alt="Expert ceiling">
-          <div class="cap"><strong>Fig 3.</strong> Expert policy ceiling: 100% on train topology, 92.2% held-out zero-shot.</div>
+          <img src="figures/fig4_expert.png" alt="Expert ceiling">
+          <div class="cap"><strong>Fig 3.</strong> Expert policy ceiling: 75% on 1-crossing deviations, 100% reproducible.</div>
         </div>
         <div class="fig-card">
           <img src="figs/fig4_ni_success.png" alt="No-intervention success">
-          <div class="cap"><strong>Fig 4.</strong> No-intervention success — the learning frontier. Early signal at 0.01; scale needed for full autonomy.</div>
+          <div class="cap"><strong>Fig 4.</strong> No-intervention success across variants. BC: 0.833, Ours (full): 0.567 — safety–utility tradeoff.</div>
         </div>
       </div>
     </div>

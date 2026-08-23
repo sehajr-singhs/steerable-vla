@@ -85,6 +85,11 @@ class CableEnv:
         persist) but flexes at its hinges when the gripper pulls. Constraints
         are enforced only within a radius of the held node, so a pull bends
         the local strand WITHOUT whipping distant units into new crossings.
+
+        We run two passes: first a forward pass that pulls toward rest
+        length, then a relaxation pass that blends toward the previous
+        configuration. This prevents the chaotic post-pull rebound that
+        causes re-tangling.
         """
         c = self.cfg
         iters = iters or c.pbd_iters
@@ -94,6 +99,8 @@ class CableEnv:
             return
         lo = max(0, self.holding - c.pbd_radius)
         hi = min(n - 2, self.holding + c.pbd_radius)
+        # Save pre-PBD positions for relaxation
+        x_prev = x.copy()
         for _ in range(iters):
             for e in range(lo, hi):
                 d = x[e + 1] - x[e]
@@ -105,6 +112,11 @@ class CableEnv:
                 if e + 1 < n - 1:
                     x[e + 1] -= corr
             x[self.holding] = self.gripper
+        # Damping: blend toward previous positions to reduce oscillation
+        damping = 0.15
+        for idx in range(lo, hi + 1):
+            if idx != self.holding and idx < n:
+                x[idx] = x[idx] * (1 - damping) + x_prev[idx] * damping
 
     def step(self, action):
         c = self.cfg

@@ -112,29 +112,39 @@ def run_expert(env, max_steps=250, record=False):
             continue
 
         i, j, p = hit
-        # exhaustive (node, direction) candidates on the return strand
+        # Candidates: crossing-segment endpoints (fast) + nearby nodes (fallback)
         base_dirs = [np.array([0.0, 1.0]), np.array([0.0, -1.0]),
                      np.array([1.0, 0.0]), np.array([-1.0, 0.0]),
                      np.array([1.0, 1.0]) / np.sqrt(2),
-                     np.array([-1.0, 1.0]) / np.sqrt(2),
-                     np.array([1.0, -1.0]) / np.sqrt(2),
-                     np.array([-1.0, -1.0]) / np.sqrt(2)]
+                     np.array([-1.0, 1.0]) / np.sqrt(2)]
         dirs = []
-        # Try ALL non-pinned nodes, not just crossing segments.
-        # After clearing one crossing, the remaining crossing's nodes
-        # may not be on the detected crossing segments.
-        for idx in range(1, len(env.x) - 1):
-            if not _reachable(env, env.x[idx]):
+        # Primary: nodes on the crossing segments (i, i+1, j, j+1)
+        for idx in (i, i + 1, j, j + 1):
+            if not (0 < idx < len(env.x) - 1) or not _reachable(env, env.x[idx]):
                 continue
             pos = env.x[idx]
             toward = np.asarray(p, dtype=float) - pos
             nrm = np.linalg.norm(toward)
             toward = toward / nrm if nrm > 1e-6 else np.array([0.0, 1.0])
-            # Prioritize nodes near the crossing
-            dist_to_cross = np.linalg.norm(pos - np.asarray(p))
-            priority = -dist_to_cross  # closer = higher priority
-            dirs.extend((idx, d, priority) for d in [toward, -toward] + base_dirs)
-        # Sort by priority (closest to crossing first)
+            for d in [toward, -toward] + base_dirs:
+                dirs.append((idx, d, -np.linalg.norm(pos - np.asarray(p))))
+        # Fallback: nearest 8 non-pinned nodes (handles post-clearance reconfiguration)
+        if len(dirs) < 12:
+            node_dists = []
+            for idx in range(1, len(env.x) - 1):
+                if not _reachable(env, env.x[idx]):
+                    continue
+                d = np.linalg.norm(env.x[idx] - np.asarray(p))
+                node_dists.append((idx, d))
+            node_dists.sort(key=lambda x: x[1])
+            for idx, nd in node_dists[:8]:
+                if any(x[0] == idx for x in dirs):
+                    continue
+                pos = env.x[idx]
+                toward = np.asarray(p, dtype=float) - pos
+                nrm = np.linalg.norm(toward)
+                toward = toward / nrm if nrm > 1e-6 else np.array([0.0, 1.0])
+                dirs.extend((idx, d, -nd) for d in [toward, -toward] + base_dirs)
         dirs.sort(key=lambda x: -x[2])
         dirs = [(idx, d) for idx, d, _ in dirs]
         if not dirs:
@@ -143,7 +153,7 @@ def run_expert(env, max_steps=250, record=False):
         node = dirs[0][0]
 
         cleared = False
-        for node, cand in dirs:
+        for node, cand in dirs[:24]:  # cap candidates for speed
             if cleared:
                 break
             snap_x = env.x.copy()
@@ -154,8 +164,8 @@ def run_expert(env, max_steps=250, record=False):
             step_vec = _clamp(env, node_pos) - env.gripper
             act([step_vec[0], step_vec[1], 0.0])
             act([0.0, 0.0, 1.0])          # grab
-            target = _clamp(env, node_pos + cand * 0.6)
-            for _ in range(12):
+            target = _clamp(env, node_pos + cand * 0.5)
+            for _ in range(6):
                 if env.crossings() < cr:
                     cleared = True
                     break
