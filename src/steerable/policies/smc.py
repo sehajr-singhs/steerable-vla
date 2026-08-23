@@ -254,6 +254,7 @@ class SMCEnabledFlowExpert(nn.Module):
         self.smc = smc_layer
         # Copy the conditioning from the base expert
         self.condition = base_expert.condition
+        self.dim_action = base_expert.dim_action
     
     def velocity(self, x_s, s, c, u=None, steering_signals=None):
         """Compute steered velocity with SMC layer."""
@@ -288,3 +289,15 @@ class SMCEnabledFlowExpert(nn.Module):
         anchor_loss = self.smc.anchoring_loss(x_s, s, c)
         
         return base_loss + 0.5 * anchor_loss
+
+    def act(self, obs, subgoal=None, nudge=None, **kw):
+        """Delegate to base expert's act method."""
+        return self.base.act(obs, subgoal, nudge=nudge, **kw)
+
+    @property
+    def cfg(self):
+        return self.base.cfg
+
+    @cfg.setter
+    def cfg(self, value):
+        self.base.cfg = value

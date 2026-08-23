@@ -15,17 +15,56 @@ from .policies.expert import run_expert
 
 
 def _subgoal_for(env, obs):
-    """Toy subgoal at inference: goal cable + first-crossing point.
+    """Subgoal at inference: goal cable + first-crossing point.
 
     The crossing point is extracted from the environment state by the
     high-level planner (the miniature's stand-in for a VLM), exactly as in
     training (data.subgoal_from_state). The flow expert only ever sees
     the resulting conditioning vector.
     """
-    from .data import subgoal_from_state
-    n = env.cfg.n_nodes
-    return subgoal_from_state(obs.shape[0], n, env.cfg.cable_len,
-                              env.x, env.gripper, env.crossings() / max(1, env.crossings0))
+    # For cable envs with cfg attribute, use the geometric heuristic
+    if hasattr(env, 'cfg') and hasattr(env.cfg, 'n_nodes'):
+        from .data import subgoal_from_state
+        n = env.cfg.n_nodes
+        return subgoal_from_state(obs.shape[0], n, env.cfg.cable_len,
+                                  env.x, env.gripper, env.crossings() / max(1, env.crossings0))
+    # For textile/tool envs: return obs as-is (the obs already contains
+    # task-relevant state). Pad to the expected subgoal dim.
+    subgoal_dim = obs.shape[0]
+    result = np.zeros(subgoal_dim, dtype=np.float32)
+    # Encode crossing progress as the first element
+    result[0] = env.crossings() / max(1, env.crossings0)
+    return result
+
+
+def _vlm_subgoal_for(env, obs, vlm_planner=None):
+    """VLM-based subgoal: render image + encode language -> predict subgoals.
+
+    Uses the VLMSubgoalPlanner to predict dense visual subgoals from
+    the rendered cable state. Falls back to geometric heuristic if
+    planner is not provided.
+    """
+    if vlm_planner is None:
+        return _subgoal_for(env, obs)
+    import torch
+    from .policies.vlm_planner import encode_language
+    # Render image
+    img = env.img_obs()  # (3, 64, 64)
+    img_t = torch.tensor(img, dtype=torch.float32).unsqueeze(0)
+    # Encode language
+    lang = encode_language('untangle the cable crossing').unsqueeze(0)
+    # Predict subgoals
+    vlm_planner.eval()
+    with torch.no_grad():
+        subgoals, confidences, K = vlm_planner(img_t, lang, n_subgoals=4)
+    # Convert to conditioning vector (flatten subgoal positions + confidence)
+    subs = subgoals[0].numpy().flatten()  # (K*2,)
+    confs = confidences[0].numpy().flatten()  # (K,)
+    # Pad to expected subgoal dimension
+    subgoal_dim = obs.shape[0] - 4  # same as obs minus gripper and progress
+    result = np.zeros(subgoal_dim, dtype=np.float32)
+    result[:len(subs)] = subs
+    return result
 
 
 def run_episode(policy, env: CableEnv, max_steps, patience, chunk, steer,

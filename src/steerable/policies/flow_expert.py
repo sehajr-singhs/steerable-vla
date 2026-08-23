@@ -267,7 +267,20 @@ def make_policy(kind, dims, tcfg: TrainConfig, dcfg: DataConfig):
         p = FlowExpert(dim_obs, dim_sub, dim_act, cfg=tcfg)
         return p
     if kind == "ours_full":
-        p = FlowExpert(dim_obs, dim_sub, dim_act, cfg=tcfg)
+        base = FlowExpert(dim_obs, dim_sub, dim_act, cfg=tcfg)
+        from .smc import SMCLayer, SMCEnabledFlowExpert
+        smc = SMCLayer(
+            dim_action=base.dim_action,
+            dim_cond=tcfg.latent,
+            dim_steer=3,
+            n_steer=3,
+            hidden=tcfg.hidden,
+            lipschitz_target=1.0,
+        )
+        p = SMCEnabledFlowExpert(base, smc)
+        p.use_subgoal = True
+        p.use_steering = True
+        p.cfg = tcfg
         return p
     if kind == "rt2":
         from ..baselines.rt2_policy import RT2Policy

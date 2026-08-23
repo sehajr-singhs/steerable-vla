@@ -42,6 +42,18 @@ class ToolUseEnv:
         self.n_clutter = n_clutter
         self.rng = np.random.RandomState(seed)
         self._init_tools()
+        self.x = self.tools[:, :2]  # cable-compat alias
+        # CableEnv-compatible cfg
+        class _Cfg:
+            n_nodes = 3
+            cable_len = 0.3
+            hold_steps = 6
+            grab_radius = 0.05
+            force_max = 30.0
+            v_gripper = 0.22
+            bounds = (-0.25, 0.25, -0.2, 0.25)
+            k_spring = 60.0
+        self.cfg = _Cfg()
         self.steps = 0
         self.max_steps = 200
         self.holding = None
@@ -61,6 +73,7 @@ class ToolUseEnv:
         self.gripper = np.array([0.0, 0.2])
         self.holding = None
         self.held_tool_idx = None
+        self.gripper_path = [self.gripper.copy()]
         # Workspace
         self.bounds = (-0.25, 0.25, -0.2, 0.25)
         # Tool morphologies (length, width, shape type)
@@ -111,6 +124,7 @@ class ToolUseEnv:
         self.steps = 0
         self.violations = 0
         self.gripper_path = [self.gripper.copy()]
+        self.x = self.tools[:, :2]  # cable-compat alias
         
         return self._obs()
     
@@ -245,3 +259,38 @@ class ToolUseEnv:
                     for i in range(self.n_tools)]
         best_tool = np.argmin(distances)
         return 1.0 if self.held_tool_idx == best_tool else 0.0
+
+    # ------------------------------------------------------------------
+    # CableEnv-compatible interface for data collection + eval
+    # ------------------------------------------------------------------
+
+    def crossings(self):
+        """Number of unresolved crossings (0 when task is done)."""
+        dist = np.linalg.norm(self.target_pos - self.target_goal)
+        return max(0, int(dist * 50))  # 0 when close to goal
+
+    @property
+    def crossings0(self):
+        return 10  # full complexity
+
+    @property
+    def zero_streak(self):
+        return getattr(self, '_zero_streak', 0)
+
+    @property
+    def x(self):
+        """Node positions (for compatibility)."""
+        return self.tools[:, :2]
+
+    @x.setter
+    def x(self, val):
+        self.tools[:, :2] = val
+
+    def max_jerk(self, dt=0.1):
+        p = np.asarray(self.gripper_path)
+        if len(p) < 4:
+            return 0.0
+        v = np.diff(p, axis=0) / dt
+        a = np.diff(v, axis=0) / dt
+        j = np.diff(a, axis=0) / dt
+        return float(np.max(np.linalg.norm(j, axis=1))) if len(j) else 0.0

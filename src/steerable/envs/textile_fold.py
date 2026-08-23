@@ -170,7 +170,19 @@ class TextileFoldEnv:
         # MuJoCo XML is available for hardware deployment (Phase III).
         self._use_mujoco = False
         self._init_simple()
-        
+        self.x = self.nodes  # cable-compat alias
+        self.gripper_path = [self.gripper.copy()]
+        # CableEnv-compatible cfg
+        class _Cfg:
+            n_nodes = 12
+            cable_len = 0.3
+            hold_steps = 6
+            grab_radius = 0.05
+            force_max = 30.0
+            v_gripper = 0.22
+            bounds = (-0.25, 0.25, -0.2, 0.25)
+            k_spring = 60.0
+        self.cfg = _Cfg()
         self.steps = 0
         self.max_steps = 200
         self.holding = None
@@ -233,6 +245,7 @@ class TextileFoldEnv:
             self.nodes = self.nodes_rest + self.rng.randn(12, 2) * 0.005
             self.gripper = np.array([0.0, 0.2])
             self.holding = None
+        self.x = self.nodes  # cable-compat alias
         
         self.steps = 0
         self.violations = 0
@@ -416,3 +429,36 @@ class TextileFoldEnv:
     def fold_iou(self):
         """Current fold IoU with target."""
         return self._compute_fold_iou()
+
+    # ------------------------------------------------------------------
+    # CableEnv-compatible interface for data collection + eval
+    # ------------------------------------------------------------------
+
+    def crossings(self):
+        """Number of unresolved crossings (0 when task is done)."""
+        iou = self._compute_fold_iou()
+        return max(0, int((1.0 - iou) * 10))  # 0 when IoU >= 1.0
+
+    @property
+    def crossings0(self):
+        """Initial crossing count."""
+        return 10  # full complexity
+
+    @property
+    def zero_streak(self):
+        return getattr(self, '_zero_streak', 0)
+
+    def _get_x(self):
+        return self.nodes
+
+    def _set_x(self, val):
+        self.nodes = val
+
+    def max_jerk(self, dt=0.1):
+        p = np.asarray(self.gripper_path)
+        if len(p) < 4:
+            return 0.0
+        v = np.diff(p, axis=0) / dt
+        a = np.diff(v, axis=0) / dt
+        j = np.diff(a, axis=0) / dt
+        return float(np.max(np.linalg.norm(j, axis=1))) if len(j) else 0.0
