@@ -1,136 +1,222 @@
-"""Diffusion Policy baseline (Chi et al. 2023).
+"""Diffusion Policy baseline: flat diffusion over action chunks.
 
-Simplified DDPM for action generation: condition on obs, denoise a
-random action sequence into a coherent chunk. Uses a small 1D U-Net
-for the denoising network.
+This is the standard diffusion policy (Chi et al., 2023) adapted to our
+cable untangling task. It denoises action chunks directly, without
+subgoal conditioning or safety filtering.
 
-For fair comparison with our flow-matching policy, we use the same
-number of denoising steps (N=5 for training, 10 for inference) and
-the same parameter budget.
+Reference: Chi et al., "Diffusion Policy: Visuomotor Policy Learning
+via Action Diffusion" (2023)
 """
 
 import torch
 import torch.nn as nn
-import numpy as np
+import torch.nn.functional as F
+import math
 
 
-class _SinusoidalEmbedding(nn.Module):
-    def __init__(self, dim: int):
+class ConditionalDenoiser(nn.Module):
+    """Simple 1D U-Net denoiser for action chunks."""
+    
+    def __init__(self, action_dim, cond_dim, hidden=128, n_steps=4):
         super().__init__()
-        self.dim = dim
-
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        half = self.dim // 2
-        freqs = torch.exp(-np.log(10000) * torch.arange(half, device=t.device).float() / half)
+        self.action_dim = action_dim
+        self.hidden = hidden
+        
+        # Time embedding
+        self.time_embed = nn.Sequential(
+            nn.Linear(32, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden),
+        )
+        
+        # Condition embedding
+        self.cond_embed = nn.Sequential(
+            nn.Linear(cond_dim, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden),
+        )
+        
+        # Denoising network (simple MLP for miniature scale)
+        self.net = nn.Sequential(
+            nn.Linear(action_dim + hidden + hidden, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, action_dim),
+        )
+    
+    def _timestep_embedding(self, t, dim=32):
+        """Sinusoidal timestep embedding."""
+        half = dim // 2
+        freqs = torch.exp(-math.log(10000) * torch.arange(half, device=t.device) / half)
         args = t[:, None] * freqs[None]
         return torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+    
+    def forward(self, x_noisy, t, condition):
+        """
+        Args:
+            x_noisy: (B, action_dim) noisy action
+            t: (B,) diffusion timestep
+            condition: (B, cond_dim) conditioning vector
+        Returns:
+            noise_pred: (B, action_dim) predicted noise
+        """
+        t_emb = self.time_embed(self._timestep_embedding(t))
+        c_emb = self.cond_embed(condition)
+        
+        h = torch.cat([x_noisy, t_emb, c_emb], dim=-1)
+        return self.net(h)
 
 
-class _Denoiser1D(nn.Module):
-    """1D U-Net denoiser for action sequences."""
-
-    def __init__(self, act_dim: int, obs_dim: int, H: int = 6, d: int = 128):
-        super().__init__()
-        self.H = H
-        total_dim = act_dim * H
-
-        self.time_emb = nn.Sequential(
-            _SinusoidalEmbedding(d), nn.Linear(d, d), nn.GELU(), nn.Linear(d, d)
-        )
-        self.obs_proj = nn.Linear(obs_dim, d)
-
-        self.in_proj = nn.Linear(total_dim + d + d, d * 2)
-        self.down1 = nn.Sequential(nn.Linear(d * 2, d), nn.GELU(), nn.Linear(d, d))
-        self.mid = nn.Sequential(nn.Linear(d, d), nn.GELU(), nn.Linear(d, d))
-        self.up1 = nn.Sequential(nn.Linear(d * 2, d), nn.GELU(), nn.Linear(d, d))
-        self.out_proj = nn.Linear(d, total_dim)
-
-    def forward(self, x_noisy: torch.Tensor, t: torch.Tensor,
-                obs: torch.Tensor) -> torch.Tensor:
-        """x_noisy: (B, H*act_dim), t: (B,), obs: (B, obs_dim) → eps: same shape"""
-        B = x_noisy.shape[0]
-        t_emb = self.time_emb(t)
-        o_emb = self.obs_proj(obs)
-
-        inp = torch.cat([x_noisy, t_emb, o_emb], dim=-1)
-        h = self.in_proj(inp)
-        h1 = self.down1(h)
-        h_mid = self.mid(h1)
-        h_cat = torch.cat([h_mid, h1], dim=-1)
-        h_out = self.up1(h_cat)
-        return self.out_proj(h_out)
-
-
-class DiffusionPolicy:
-    """DDPM-based action generation policy.
-
-    Training: sample noise, denoise for 1 step, predict noise.
-    Inference: 10-step denoising from pure noise.
+class DiffusionPolicy(nn.Module):
+    """Diffusion Policy: flat denoising over action chunks.
+    
+    At inference, iteratively denoises from Gaussian noise to an action,
+    conditioned on the current observation.
     """
-
-    def __init__(self, dim_obs: int, dim_action: int, hidden: int = 128,
-                 lr: float = 2e-4, n_train_steps: int = 5, n_infer_steps: int = 10):
-        self.dim_obs = dim_obs
+    
+    def __init__(self, dim_obs, dim_subgoal, dim_action,
+                 n_diffusion_steps=100, hidden=128):
+        super().__init__()
         self.dim_action = dim_action
-        self._H = 6
-        self._n_train = n_train_steps
-        self._n_infer = n_infer_steps
-        self._total_dim = dim_action * self._H
-
-        self._denoiser = _Denoiser1D(dim_action, dim_obs, H=self._H, d=hidden)
-        self._opt = torch.optim.AdamW(self._denoiser.parameters(), lr=lr)
-
-        # DDPM schedule
-        N = n_infer_steps
-        self._betas = torch.linspace(1e-4, 0.02, N)
-        self._alphas = 1.0 - self._betas
-        self._alpha_bar = torch.cumprod(self._alphas, dim=0)
-
-    def train_step(self, obs_batch: torch.Tensor, act_batch: torch.Tensor) -> float:
-        """obs: (B, obs_dim), act: (B, H, 3) or (B, H*3) → loss."""
-        B = obs_batch.shape[0]
-        if act_batch.dim() == 3:
-            target = act_batch[:, :self._H, :self.dim_action].reshape(B, self._total_dim)
-        else:
-            target = act_batch[:, :self._total_dim]
-
-        # sample random timestep and noise
-        t = torch.randint(0, self._n_train, (B,))
-        ab = self._alpha_bar.to(obs_batch.device)[t]
-        noise = torch.randn_like(target)
-        noisy = ab.sqrt().unsqueeze(1) * target + (1 - ab).sqrt().unsqueeze(1) * noise
-
-        eps_pred = self._denoiser(noisy, t.float(), obs_batch)
-        loss = nn.functional.mse_loss(eps_pred, noise)
-        self._opt.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(self._denoiser.parameters(), 1.0)
-        self._opt.step()
-        return float(loss.item())
-
+        self.n_steps = n_diffusion_steps
+        
+        # Condition = observation + subgoal concatenated
+        cond_dim = dim_obs + dim_subgoal
+        
+        self.denoiser = ConditionalDenoiser(dim_action, cond_dim, hidden)
+        
+        # Beta schedule
+        betas = torch.linspace(1e-4, 0.02, n_diffusion_steps)
+        alphas = 1 - betas
+        alphas_bar = torch.cumprod(alphas, dim=0)
+        self.register_buffer('betas', betas)
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('alphas_bar', alphas_bar)
+    
+    def q_sample(self, x0, t, noise=None):
+        """Forward diffusion: add noise to x0 at timestep t."""
+        if noise is None:
+            noise = torch.randn_like(x0)
+        alpha_bar = self.alphas_bar[t].reshape(-1, 1)
+        return torch.sqrt(alpha_bar) * x0 + torch.sqrt(1 - alpha_bar) * noise
+    
+    def forward(self, obs, subgoal=None, actions=None):
+        """Unified forward: returns loss when actions provided, else sampled actions.
+        
+        This is the interface the shared train_policy loop expects.
+        """
+        if subgoal is None:
+            subgoal = torch.zeros_like(obs)
+        if actions is not None:
+            return self.training_loss(obs, subgoal, actions)
+        return self.sample(obs, subgoal)
+    
+    def training_loss(self, obs, subgoal, chunk):
+        """Compute the diffusion training loss.
+        
+        Args:
+            obs: (B, dim_obs) observations
+            subgoal: (B, dim_subgoal) subgoals
+            chunk: (B, dim_action) action chunks
+        Returns:
+            loss: scalar
+        """
+        B = chunk.shape[0]
+        dev = chunk.device
+        
+        # Sample random timesteps
+        t = torch.randint(0, self.n_steps, (B,), device=dev)
+        
+        # Sample noise
+        noise = torch.randn_like(chunk)
+        
+        # Add noise
+        x_noisy = self.q_sample(chunk, t, noise)
+        
+        # Condition
+        condition = torch.cat([obs, subgoal], dim=-1)
+        
+        # Predict noise
+        noise_pred = self.denoiser(x_noisy, t, condition)
+        
+        return F.mse_loss(noise_pred, noise)
+    
     @torch.no_grad()
-    def act(self, obs: np.ndarray, subgoal: np.ndarray = None) -> np.ndarray:
-        """Return flat (H*3,) action chunk for the eval harness."""
-        device = next(self._denoiser.parameters()).device
-        obs_t = torch.tensor(obs, dtype=torch.float32, device=device).unsqueeze(0)
+    def sample(self, obs, subgoal, n_samples=1):
+        """DDPM sampling: denoise from Gaussian to action.
+        
+        Args:
+            obs: (1, dim_obs) or (B, dim_obs)
+            subgoal: (1, dim_subgoal) or (B, dim_subgoal)
+            n_samples: number of samples to average
+        Returns:
+            actions: (dim_action,) or (B, dim_action)
+        """
+        self.eval()
+        dev = next(self.parameters()).device
+        
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0).to(dev)
+            subgoal = subgoal.unsqueeze(0).to(dev)
+        
+        B = obs.shape[0]
+        condition = torch.cat([obs, subgoal], dim=-1)
+        
+        # Start from noise
+        x = torch.randn(B, self.dim_action, device=dev)
+        
+        # Denoise
+        for t in reversed(range(self.n_steps)):
+            t_tensor = torch.full((B,), t, device=dev, dtype=torch.long)
+            noise_pred = self.denoiser(x, t_tensor, condition)
+            
+            alpha = self.alphas[t]
+            alpha_bar = self.alphas_bar[t]
+            beta = self.betas[t]
+            
+            if t > 0:
+                noise = torch.randn_like(x)
+            else:
+                noise = torch.zeros_like(x)
+            
+            x = (1 / torch.sqrt(alpha)) * (
+                x - (beta / torch.sqrt(1 - alpha_bar)) * noise_pred
+            ) + torch.sqrt(beta) * noise
+        
+        # Average multiple samples
+        all_samples = []
+        for _ in range(n_samples):
+            x = torch.randn(B, self.dim_action, device=dev)
+            for t in reversed(range(self.n_steps)):
+                t_tensor = torch.full((B,), t, device=dev, dtype=torch.long)
+                noise_pred = self.denoiser(x, t_tensor, condition)
+                alpha = self.alphas[t]
+                alpha_bar = self.alphas_bar[t]
+                beta = self.betas[t]
+                noise = torch.randn_like(x) if t > 0 else torch.zeros_like(x)
+                x = (1 / torch.sqrt(alpha)) * (
+                    x - (beta / torch.sqrt(1 - alpha_bar)) * noise_pred
+                ) + torch.sqrt(beta) * noise
+            all_samples.append(x)
+        
+        return torch.stack(all_samples).mean(0)
+    
+    def act(self, obs, subgoal=None, **kw):
+        """Compatibility interface."""
+        self.eval()
+        dev = next(self.parameters()).device
+        if isinstance(obs, np.ndarray):
+            obs = torch.tensor(obs, dtype=torch.float32, device=dev)
+        if subgoal is None:
+            subgoal = torch.zeros_like(obs)
+        elif isinstance(subgoal, np.ndarray):
+            subgoal = torch.tensor(subgoal, dtype=torch.float32, device=dev)
+        
+        with torch.no_grad():
+            return self.sample(obs.unsqueeze(0), subgoal.unsqueeze(0))[0].cpu().numpy()
 
-        # start from noise
-        x = torch.randn(1, self._total_dim, device=device)
 
-        for i in range(self._n_infer):
-            t = torch.full((1,), i, dtype=torch.float32, device=device)
-            eps = self._denoiser(x, t, obs_t)
-            alpha = self._alphas[i].to(device)
-            alpha_bar = self._alpha_bar[i].to(device)
-            x = (1 / alpha.sqrt()) * (x - (1 - alpha) / (1 - alpha_bar).sqrt() * eps)
-            if i < self._n_infer - 1:
-                x += torch.randn_like(x) * (self._betas[i] ** 0.5).to(device)
-
-        # flatten to (H*3,) for the eval harness
-        return x.reshape(-1).cpu().numpy().astype(np.float32)
-
-    def state_dict(self):
-        return {"denoiser": self._denoiser.state_dict()}
-
-    def load_state_dict(self, d):
-        self._denoiser.load_state_dict(d["denoiser"])
+import numpy as np

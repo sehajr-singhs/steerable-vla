@@ -2,13 +2,14 @@
 
 Implements:
   - BC: standard behavior cloning (MLP, no flow matching)
-  - ACT: Action Chunking Transformer (Zhao et al. 2023)
+  - RT2Policy: RT-2 style VLM → discretized actions (Brohan et al. 2023)
+  - ACT: Action Chunking Transformer with CVAE (Zhao et al. 2023)
   - DiffusionPolicy: diffusion-based action generation (Chi et al. 2023)
-  - ImitatorPolicy: oracle-based imitation (simplified)
 """
 
 from .bc_policy import BCPolicy
 from .act_policy import ACTPolicy
 from .diffusion_policy import DiffusionPolicy
+from .rt2_policy import RT2Policy
 
-__all__ = ["BCPolicy", "ACTPolicy", "DiffusionPolicy"]
+__all__ = ["BCPolicy", "RT2Policy", "ACTPolicy", "DiffusionPolicy"]

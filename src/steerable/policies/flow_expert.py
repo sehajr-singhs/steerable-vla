@@ -241,7 +241,18 @@ class BCPolicy(nn.Module):
 
 
 def make_policy(kind, dims, tcfg: TrainConfig, dcfg: DataConfig):
-    """Factory for the study's variants."""
+    """Factory for all study variants.
+    
+    Variants:
+      bc: Behavioral cloning (flat MLP, no flow, no subgoals)
+      flow_flat: Flow matching without subgoals or steering
+      ours_nofilter: Flow + SMC + subgoals, no CBF filter at inference
+      ours_full: Flow + SMC + subgoals + CBF filter (full system)
+      rt2: RT-2 style VLM → discretized actions (no hierarchy)
+      diffusion: Diffusion Policy (flat denoising, no hierarchy)
+      act: Action Chunking Transformer with CVAE
+      transformer: Self-attention over nodes (previous baseline)
+    """
     dim_obs, dim_sub, dim_act = dims
     if kind == "bc":
         p = BCPolicy(dim_obs, dim_sub, dim_act, tcfg)
@@ -258,6 +269,18 @@ def make_policy(kind, dims, tcfg: TrainConfig, dcfg: DataConfig):
     if kind == "ours_full":
         p = FlowExpert(dim_obs, dim_sub, dim_act, cfg=tcfg)
         return p
+    if kind == "rt2":
+        from ..baselines.rt2_policy import RT2Policy
+        p = RT2Policy(dim_obs=dim_obs, dim_subgoal=dim_sub, dim_action=dim_act,
+                      embed_dim=tcfg.hidden)
+        p._ensure_built(dim_obs + dim_sub)  # force-build layers now
+        return p
+    if kind == "diffusion":
+        from ..baselines.diffusion_policy import DiffusionPolicy
+        return DiffusionPolicy(dim_obs, dim_sub, dim_act, hidden=tcfg.hidden)
+    if kind == "act":
+        from ..baselines.act_policy import ACTPolicy
+        return ACTPolicy(dim_obs, dim_sub, dim_act, embed_dim=tcfg.hidden)
     if kind == "transformer":
         from .transformer_policy import TransformerPolicy
         n_nodes = (dim_obs - 4) // 2
@@ -316,7 +339,14 @@ def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
             elif hasattr(policy, 'cfm_loss'):
                 loss = policy.cfm_loss(ob, su, ch, nu, rng, dcfg.steer_prob)
             else:
-                loss = policy.forward(ob, su, g1=ch)
+                # New baselines (RT2, Diffusion, ACT) have their own forward
+                try:
+                    loss = policy.forward(ob, su, actions=ch)
+                except TypeError:
+                    try:
+                        loss = policy.forward(ob, su, g1=ch)
+                    except TypeError:
+                        loss = policy.forward(ob, su)
             loss.backward()
             if tcfg.grad_clip > 0:
                 torch.nn.utils.clip_grad_norm_(policy.parameters(), tcfg.grad_clip)

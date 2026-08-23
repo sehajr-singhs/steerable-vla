@@ -186,3 +186,104 @@ class CableEnv:
 
     def snapshot(self):
         return self.x.copy()
+
+    # ------------------------------------------------------------------
+    # image observations (for VLM planner)
+    # ------------------------------------------------------------------
+
+    def render(self, img_size=64):
+        """Render the cable state as an RGB image.
+        
+        Returns a (img_size, img_size, 3) uint8 array suitable for
+        the VLM planner's image encoder.
+        """
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            from io import BytesIO
+            import PIL.Image
+        except ImportError:
+            # Fallback: encode the state as a simple pixel pattern
+            return self._render_fallback(img_size)
+        
+        fig, ax = plt.subplots(1, 1, figsize=(1, 1), dpi=img_size)
+        ax.set_xlim(self.cfg.bounds[0], self.cfg.bounds[1])
+        ax.set_ylim(self.cfg.bounds[2], self.cfg.bounds[3])
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        # Draw cable segments
+        for i in range(len(self.x) - 1):
+            ax.plot(self.x[i:i+2, 0], self.x[i:i+2, 1],
+                    'b-', linewidth=2, solid_capstyle='round')
+        
+        # Draw gripper
+        color = 'red' if self.holding is not None else 'gray'
+        ax.plot(self.gripper[0], self.gripper[1], 'o',
+                color=color, markersize=4)
+        
+        # Draw pin points
+        ax.plot(self.x[0, 0], self.x[0, 1], 's', color='black', markersize=3)
+        ax.plot(self.x[-1, 0], self.x[-1, 1], 's', color='black', markersize=3)
+        
+        buf = BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
+        buf.seek(0)
+        img = PIL.Image.open(buf).convert('RGB').resize((img_size, img_size))
+        import numpy as np
+        return np.array(img)
+    
+    def _render_fallback(self, img_size=64):
+        """Fallback renderer: encode state as pixel pattern without matplotlib."""
+        import numpy as np
+        img = np.zeros((img_size, img_size, 3), dtype=np.uint8)
+        # Map cable nodes to pixel coordinates
+        for i in range(len(self.x) - 1):
+            x1 = int((self.x[i, 0] - self.cfg.bounds[0]) / (self.cfg.bounds[1] - self.cfg.bounds[0]) * (img_size - 1))
+            y1 = int((self.x[i, 1] - self.cfg.bounds[2]) / (self.cfg.bounds[3] - self.cfg.bounds[2]) * (img_size - 1))
+            x2 = int((self.x[i+1, 0] - self.cfg.bounds[0]) / (self.cfg.bounds[1] - self.cfg.bounds[0]) * (img_size - 1))
+            y2 = int((self.x[i+1, 1] - self.cfg.bounds[2]) / (self.cfg.bounds[3] - self.cfg.bounds[2]) * (img_size - 1))
+            y1, y2 = img_size - 1 - y1, img_size - 1 - y2  # flip y
+            # Bresenham line
+            dx, dy = abs(x2 - x1), abs(y2 - y1)
+            sx = 1 if x1 < x2 else -1
+            sy = 1 if y1 < y2 else -1
+            err = dx - dy
+            while True:
+                if 0 <= x1 < img_size and 0 <= y1 < img_size:
+                    img[y1, x1] = [50, 100, 200]
+                if x1 == x2 and y1 == y2:
+                    break
+                e2 = 2 * err
+                if e2 > -dy:
+                    err -= dy
+                    x1 += sx
+                if e2 < dx:
+                    err += dx
+                    y1 += sy
+        # Gripper
+        gx = int((self.gripper[0] - self.cfg.bounds[0]) / (self.cfg.bounds[1] - self.cfg.bounds[0]) * (img_size - 1))
+        gy = int((self.gripper[1] - self.cfg.bounds[2]) / (self.cfg.bounds[3] - self.cfg.bounds[2]) * (img_size - 1))
+        gy = img_size - 1 - gy
+        for dx in range(-2, 3):
+            for dy in range(-2, 3):
+                px, py = gx + dx, gy + dy
+                if 0 <= px < img_size and 0 <= py < img_size:
+                    img[py, px] = [200, 50, 50]
+        # Pins
+        for px, py in [(0, 0), (img_size-1, 0)]:
+            for dx in range(-1, 2):
+                for dy in range(-1, 2):
+                    if 0 <= px+dx < img_size and 0 <= py+dy < img_size:
+                        img[py+dy, px+dx] = [0, 0, 0]
+        return img
+    
+    def img_obs(self, img_size=64):
+        """Return image observation as (C, H, W) float32 tensor in [0, 1]."""
+        import numpy as np
+        img = self.render(img_size)
+        # (H, W, 3) -> (3, H, W) and normalize
+        img = img.transpose(2, 0, 1).astype(np.float32) / 255.0
+        return img
