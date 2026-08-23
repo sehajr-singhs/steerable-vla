@@ -480,6 +480,10 @@ Ours $-$ filter & 0.011 & 3.67 & 1.14 & 14.1 & 0.947 \\
 \end{tabular}
 \end{table}
 
+Fig.~\ref{fig:violations} visualizes the headline result: the CBF--QP safety
+filter eliminates all workspace violations. Fig.~\ref{fig:ablation} presents the
+full ablation across all metrics.
+
 The headline result (Table~\ref{tab:main}) is a clean separation on safety:
 \textbf{the full system achieves zero workspace-bound violations across all
 seeds and episodes}, while every variant without the CBF filter accumulates
@@ -517,6 +521,22 @@ confirming that steering alone does not degrade smoothness --- the safety
 filter's contribution is specifically the violation guarantee, not task
 performance.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig1_violations.png}
+\caption{Workspace violations per episode (mean $\pm$ std, 3 seeds, $n=30$).
+The full system (CBF--QP filter) achieves \textbf{zero violations}.}
+\label{fig:violations}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig5_overview.png}
+\caption{Full system comparison: assisted success rate (left) and safety
+violations (right) across all variants.}
+\label{fig:ablation}
+\end{figure}
+
 \section{Discussion}
 \label{sec:disc}
 
@@ -540,6 +560,14 @@ reduces crossings substantially but requires one oracle assist for the final
 crossing. This is consistent with the training budget (150 demonstrations on
 CPU); the full GPU-scale study (150 demonstrations, 200 epochs on NVIDIA T4,
 flywheel compounding over 3 iterations) is designed to test this claim at scale.
+As an architectural scaling signal, we also evaluate a 5.3-million-parameter
+Transformer backbone with self-attention over cable-node tokens and
+cross-attention with subgoal conditioning. On GPU this architecture trains in
+under 30 seconds (150 demonstrations, 200 epochs) and produces coherent action
+chunks, but its no-intervention success at miniature scale remains comparable to
+the MLP --- confirming that at this scale the bottleneck is data and task
+difficulty, not model capacity. A full-scale Transformer study is part of the
+next experimental phase.
 
 Two limitations are honest from the start. First, the hierarchy's benefits are
 conditional on the VLM's subgoal quality: if the planner predicts infeasible

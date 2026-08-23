@@ -149,7 +149,8 @@
         <b>Variants</b> — <span class="mono">bc</span> (flat behavioral cloning) ·
         <span class="mono">flow_flat</span> (flow matching, no subgoals, no steering) ·
         <span class="mono">ours_nofilter</span> (subgoals + SMC, no safety filter) ·
-        <span class="mono">ours_full</span> (everything) — × 3 seeds.<br>
+        <span class="mono">ours_full</span> (everything) ·
+        <span class="mono">transformer</span> (5.3M-param Transformer backbone, self-attention over cable nodes) — × 3 seeds.<br>
         <b>Train</b> — crossing topologies {2, 3}, stiffness × {0.9, 1.1}.<br>
         <b>Zero-shot eval</b> — held-out topology {4}, stiffness × {0.6, 1.5}, fresh starts.<br>
         <b>Metrics</b> — success · no-intervention success · crossings reduced · steps ·
@@ -186,6 +187,39 @@
   <section class="block">
     <div class="sec-head">
       <span class="sec-num">05 /</span>
+      <h2 class="sec-title">Figures</h2>
+    </div>
+    <p class="body" style="margin-bottom:18px;">
+      Publication-quality figures generated from committed GPU results
+      (<span class="mono" style="font-size:0.85em;">scripts/figures.py</span>).
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;">
+      <div style="background:var(--paper);border:1px solid var(--hairline);padding:16px;">
+        <img src="figs/fig1_violations.png" alt="Safety violations" style="width:100%;height:auto;">
+        <p class="dim" style="font-size:0.8rem;margin-top:8px;">Fig 1: CBF filter eliminates all workspace violations.</p>
+      </div>
+      <div style="background:var(--paper);border:1px solid var(--hairline);padding:16px;">
+        <img src="figs/fig2_ablation.png" alt="Ablation results" style="width:100%;height:auto;">
+        <p class="dim" style="font-size:0.8rem;margin-top:8px;">Fig 2: Each component contributes to the overall system.</p>
+      </div>
+      <div style="background:var(--paper);border:1px solid var(--hairline);padding:16px;">
+        <img src="figs/fig3_expert.png" alt="Expert ceiling" style="width:100%;height:auto;">
+        <p class="dim" style="font-size:0.8rem;margin-top:8px;">Fig 3: Expert policy ceiling — 100% train, 92.2% held-out.</p>
+      </div>
+      <div style="background:var(--paper);border:1px solid var(--hairline);padding:16px;">
+        <img src="figs/fig4_ni_success.png" alt="No-intervention success" style="width:100%;height:auto;">
+        <p class="dim" style="font-size:0.8rem;margin-top:8px;">Fig 4: No-intervention success — the learning frontier.</p>
+      </div>
+      <div style="background:var(--paper);border:1px solid var(--hairline);padding:16px;grid-column:span 2;">
+        <img src="figs/fig5_overview.png" alt="System overview" style="width:100%;height:auto;">
+        <p class="dim" style="font-size:0.8rem;margin-top:8px;">Fig 5: Full system comparison — success rates and safety violations.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="sec-head">
+      <span class="sec-num">06 /</span>
       <h2 class="sec-title">Reproduce</h2>
     </div>
     <div class="eq" style="font-family:'IBM Plex Mono',monospace; font-size:0.82rem; line-height:2.0;">
@@ -227,7 +261,7 @@ fetch('results.json').then(r => r.json()).then(d => {
     el.innerHTML = '<p class="body dim">The committed study run is in flight — results.json will render here the moment the GPU run lands and render_results.py runs.</p>';
     return;
   }
-  const vname = {bc:'BC (flat MLP)', flow_flat:'Flow (no subgoals)', ours_nofilter:'Ours − safety filter', ours_full:'Ours (full)'};
+  const vname = {bc:'BC (flat MLP)', flow_flat:'Flow (no subgoals)', ours_nofilter:'Ours − safety filter', ours_full:'Ours (full)', transformer:'Transformer (5.3M)'};
   let h = '<div class="tablescroll"><table><thead><tr>' +
     '<th>variant</th><th>success</th><th>no-interv.</th><th>crossings↓</th><th>steps</th>' +
     '<th>max jerk</th><th>violations</th><th>interventions</th></tr></thead><tbody>';

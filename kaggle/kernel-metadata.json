@@ -1,13 +1,11 @@
 {
   "id": "sehajrsingh/steerable-vla-gpu-study",
-  "title": "Steerable VLA — GPU Study v11",
-  "code_file": "kernel_v11.py",
+  "title": "steerable-vla-gpu-study",
+  "code_file": "kernel.py",
   "language": "python",
   "kernel_type": "script",
-  "is_private": "true",
-  "enable_gpu": "true",
-  "enable_internet": "true",
-  "competition_sources": [],
-  "dataset_sources": ["sehajrsingh/steerable-vla-src"],
-  "model_sources": []
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["sehajrsingh/steerable-vla-src"]
 }

@@ -1,74 +1,26 @@
-"""Steerable VLA — full GPU study with Transformer backbone.
+"""Steerable VLA — full GPU study v12 with Transformer backbone.
 
-Dataset rides in as a Kaggle dataset uploaded with --dir-mode tar.
-This script extracts it, then runs the full study.
+Adds the 5.3M-parameter CableTransformer alongside the existing baselines.
 """
 
-import os, sys, time, json, tarfile
+import os, sys, time, json
 
 import torch
 print("cuda available:", torch.cuda.is_available(), flush=True)
 if torch.cuda.is_available():
     print("gpu:", torch.cuda.get_device_name(0), flush=True)
-    print("gpu memory:", round(torch.cuda.get_device_properties(0).total_mem / 1e9, 1), "GB", flush=True)
 
-# Extract the dataset tarballs
-SRC_RAW = "/kaggle/input/steerable-vla-src"
-SRC = "/kaggle/working/src"
-os.makedirs(SRC, exist_ok=True)
-
-# List what Kaggle mounted
-input_files = []
-if os.path.isdir(SRC_RAW):
-    for f in os.listdir(SRC_RAW):
-        fpath = os.path.join(SRC_RAW, f)
-        input_files.append(f)
-        if f.endswith('.tar'):
-            print(f"extracting {f}...", flush=True)
-            with tarfile.open(fpath) as tar:
-                tar.extractall(path=SRC, filter='data')
-        elif os.path.isdir(fpath):
-            # flat upload — just copy
-            import shutil
-            dest = os.path.join(SRC, f)
-            if not os.path.exists(dest):
-                shutil.copytree(fpath, dest)
-
-print(f"input files: {input_files}", flush=True)
-print(f"src contents: {os.listdir(SRC) if os.path.isdir(SRC) else 'MISSING'}", flush=True)
-
-# Find the steerable package
-steerable_dir = None
-for candidate in [os.path.join(SRC, "src"), SRC]:
-    if os.path.isdir(os.path.join(candidate, "steerable")):
-        steerable_dir = candidate
-        break
-
-if steerable_dir is None:
-    # Fallback: check if src/steerable is directly in SRC
-    for root, dirs, files in os.walk(SRC):
-        if "config.py" in files and "__init__.py" in files:
-            if os.path.basename(root) == "steerable":
-                steerable_dir = os.path.dirname(root)
-                break
-
-if steerable_dir:
-    print(f"found steerable at: {steerable_dir}", flush=True)
-    sys.path.insert(0, steerable_dir)
-else:
-    print("WARNING: steerable not found, using SRC fallback", flush=True)
-    sys.path.insert(0, SRC)
-    sys.path.insert(0, os.path.join(SRC, "src"))
+SRC = "/kaggle/input/steerable-vla-src"
+sys.path.insert(0, SRC)
+sys.path.insert(0, os.path.join(SRC, "src"))
 
 from steerable.config import EnvConfig, DataConfig, TrainConfig, EvalConfig, FlywheelConfig
-
 env_cfg = EnvConfig()
 dcfg = DataConfig()
 tcfg = TrainConfig()
 ecfg = EvalConfig()
 fcfg = FlywheelConfig()
 
-# GPU-scale hyperparameters
 tcfg.epochs = 200
 tcfg.batch = 128
 tcfg.flow_steps = 24
@@ -76,9 +28,7 @@ tcfg.n_samples = 8
 ecfg.n_eval = 30
 ecfg.max_steps = 120
 ecfg.patience = 24
-fcfg.iterations = 3
-fcfg.n_deploy = 20
-fcfg.retrain_epochs = 25
+ecfg.replan = 1
 N_DEMOS = 150
 N_SEEDS = 3
 
@@ -87,7 +37,6 @@ from steerable.data import collect_demos, build_dataset
 from steerable.policies.flow_expert import make_policy, train_policy
 from steerable.policies.expert import run_expert
 from steerable.eval import evaluate
-from steerable.flywheel.loop import run_flywheel
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"device: {DEVICE}", flush=True)
@@ -112,7 +61,7 @@ os.makedirs("/kaggle/working/results", exist_ok=True)
 os.chdir("/kaggle/working")
 t0 = time.time()
 
-# ── Phase 1: Expert ceiling ──────────────────────────────────────────
+# Phase 1: Expert ceiling
 print("=" * 60, flush=True)
 print("PHASE 1: Expert ceiling", flush=True)
 print("=" * 60, flush=True)
@@ -130,11 +79,10 @@ for s in range(N_SEEDS):
         print(f"  {fam_name} seed={s}: {sum(succ)/len(succ):.3f} ({time.time()-t0:.0f}s)", flush=True)
 with open("results/expert.json", "w") as f:
     json.dump(expert_out, f, indent=2)
-print("expert done", flush=True)
 
-# ── Phase 2: Main protocol ───────────────────────────────────────────
+# Phase 2: Main protocol — all variants including transformer
 print("=" * 60, flush=True)
-print("PHASE 2: Main protocol (5 variants x 3 seeds)", flush=True)
+print("PHASE 2: Main protocol", flush=True)
 print("=" * 60, flush=True)
 o, s, a = dims()
 variants = ["bc", "flow_flat", "ours_nofilter", "ours_full", "transformer"]
@@ -175,35 +123,17 @@ with open("results/main.json", "w") as f:
     json.dump(rows, f, indent=2, default=float)
 print(f"main done total={time.time()-t0:.0f}s", flush=True)
 
-# ── Phase 3: Flywheel ────────────────────────────────────────────────
-print("=" * 60, flush=True)
-print("PHASE 3: Data flywheel (3 strategies)", flush=True)
-print("=" * 60, flush=True)
-for strat in ["none", "near_miss", "relabel"]:
-    t_f0 = time.time()
-    fw = run_flywheel(
-        train_fac,
-        lambda: make_policy("ours_full", (o, s, a), tcfg, dcfg),
-        (o, s, a), tcfg, dcfg, fcfg, strategy=strat,
-        seed=0, device=DEVICE, n_demos0=N_DEMOS)
-    with open(f"results/flywheel_{strat}.json", "w") as f:
-        json.dump(fw, f, indent=2, default=float)
-    print(f"  {strat}: curve={fw['curve']} ({time.time()-t_f0:.0f}s)", flush=True)
-
-# ── Summary ──────────────────────────────────────────────────────────
+# Summary
 meta = {"device": DEVICE, "cuda": torch.cuda.is_available(),
         "torch": torch.__version__,
         "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
         "seeds": N_SEEDS, "n_demos": N_DEMOS, "epochs": tcfg.epochs,
-        "n_eval": ecfg.n_eval,
         "total_time_s": time.time() - t0}
 with open("results/meta.json", "w") as f:
     json.dump(meta, f, indent=2)
 print("=" * 60, flush=True)
 print(f"STUDY COMPLETE in {time.time()-t0:.0f}s", flush=True)
-print(f"device: {DEVICE}", flush=True)
 for r in rows:
     print(f"  {r['variant']:20s} s{r['seed']}: ni={r['ni_success']:.2f} "
-          f"cr={r['crossings_reduced']:.1f} intv={r['interventions']:.1f} "
-          f"vio={r['violations']:.0f}", flush=True)
+          f"cr={r['crossings_reduced']:.1f} vio={r['violations']:.0f}", flush=True)
 print("=" * 60, flush=True)

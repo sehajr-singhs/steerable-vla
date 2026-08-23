@@ -1,261 +1,247 @@
 #!/usr/bin/env python3
 """Generate publication-quality figures for the NMI paper.
 
-Usage:
-    python scripts/figures.py --results results/benchmark_results.json
+Reads results/main.json (per-variant, per-seed) and results/expert.json.
+Outputs PDF+PNG to docs/figures/.
 
-Generates:
-  - fig1_system.pdf: System overview diagram
-  - fig2_results.pdf: Main results table as heatmap
-  - fig3_ablation.pdf: Ablation study (filter / subgoal / replan)
-  - fig4_curves.pdf: Training curves / flywheel iterations
-  - fig5_real.pdf: Sim-to-real comparison (UR5 env)
+Usage:
+    PYTHONPATH=src python scripts/figures.py
 """
 
-import os
-import sys
-import json
-import argparse
+import os, sys, json
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-try:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.gridspec import GridSpec
-    HAS_MPL = True
-except ImportError:
-    HAS_MPL = False
-    print("WARNING: matplotlib not installed. Install with: pip install matplotlib")
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
 
-# -- Style constants matching the repo's dark theme --
-COLORS = {
-    "bc": "#e74c3c",
-    "act": "#3498db",
-    "diffusion": "#2ecc71",
-    "flow_flat": "#f39c12",
-    "ours_nofilter": "#9b59b6",
-    "ours": "#1abc9c",
-    "expert": "#95a5a6",
-}
-
-STYLE = {
-    "font.family": "sans-serif",
-    "font.size": 10,
-    "axes.titlesize": 12,
-    "axes.labelsize": 10,
+# ── Publication style ──────────────────────────────────────────────
+rcParams.update({
+    "font.family": "serif",
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.labelsize": 11,
     "xtick.labelsize": 9,
     "ytick.labelsize": 9,
-    "legend.fontsize": 8,
+    "legend.fontsize": 9,
     "figure.dpi": 300,
     "savefig.dpi": 300,
     "savefig.bbox": "tight",
     "axes.grid": True,
     "grid.alpha": 0.3,
+    "pdf.fonttype": 42,   # editable text in PDF
+    "ps.fonttype": 42,
+})
+
+# Colors: colorblind-friendly palette
+C = {
+    "BC": "#E74C3C",
+    "Flow (flat)": "#F39C12",
+    "Ours − filter": "#9B59B6",
+    "Ours (full)": "#1ABC9C",
+    "Expert": "#7F8C8D",
 }
 
+OUT = "docs/figures"
+os.makedirs(OUT, exist_ok=True)
 
-def fig_main_results(results, out_dir):
-    """Fig 2: Main results heatmap — variants × metrics."""
-    if not HAS_MPL:
-        return
 
-    plt.rcParams.update(STYLE)
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+def _agg(main_path):
+    """Load main.json and return {variant: {metric: (mean, std)}}."""
+    with open(main_path) as f:
+        rows = json.load(f)
+    groups = {}
+    for r in rows:
+        v = r["variant"]
+        groups.setdefault(v, []).append(r)
+    out = {}
+    for v, rs in groups.items():
+        label_map = {
+            "bc": "BC", "flow_flat": "Flow (flat)",
+            "ours_nofilter": "Ours − filter", "ours_full": "Ours (full)",
+        }
+        label = label_map.get(v, v)
+        out[label] = {}
+        for m in ["success", "ni_success", "crossings_reduced", "violations", "interventions", "jerk", "steps"]:
+            vals = [r[m] for r in rs]
+            out[label][m] = (np.mean(vals), np.std(vals))
+    return out
 
-    variants = []
-    metrics = {
-        "success": "Task Success",
-        "crossings_reduced": "Crossings Reduced",
-        "violations": "Safety Violations",
-    }
 
-    for key, data in results.items():
-        if isinstance(data, dict) and "variants" in data:
-            variants = list(data["variants"].keys())
-            break
+def _expert(expert_path):
+    with open(expert_path) as f:
+        d = json.load(f)
+    train = np.mean([e["success"] for e in d["train"]])
+    held = np.mean([e["success"] for e in d["held"]])
+    return train, held
 
-    if not variants:
-        print("  No variant data found for fig_main_results")
-        return
 
-    for ax_idx, (metric, title) in enumerate(metrics.items()):
-        ax = axes[ax_idx]
-        vals = []
-        for v in variants:
-            vdata = None
-            for key, data in results.items():
-                if isinstance(data, dict) and "variants" in data and v in data["variants"]:
-                    vdata = data["variants"][v]
-                    break
-            if vdata and metric in vdata:
-                vals.append(vdata[metric])
-            else:
-                vals.append(0)
-
-        colors = [COLORS.get(v.split("_s")[0].replace("-", "_"), "#95a5a6") for v in variants]
-        bars = ax.barh(range(len(variants)), vals, color=colors, edgecolor="white", linewidth=0.5)
-        ax.set_yticks(range(len(variants)))
-        ax.set_yticklabels([v.replace("_s0", "").replace("_s1", "").replace("_s2", "")
-                           for v in variants], fontsize=8)
-        ax.set_title(title)
-        ax.set_xlabel("Score" if metric != "violations" else "Count")
-
-        # value labels
-        for bar, val in zip(bars, vals):
-            ax.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height() / 2,
-                   f"{val:.2f}", va="center", fontsize=7)
-
-    fig.suptitle("Main Protocol Results (Cable Untangling)", fontsize=14, y=1.02)
+def fig1_violations(data, out):
+    """Fig 1: Safety violations — the hero result."""
+    fig, ax = plt.subplots(figsize=(5, 3.5))
+    labels = ["BC", "Flow (flat)", "Ours − filter", "Ours (full)"]
+    means = [data[v]["violations"][0] for v in labels]
+    stds = [data[v]["violations"][1] for v in labels]
+    colors = [C[v] for v in labels]
+    bars = ax.bar(range(len(labels)), means, yerr=stds, color=colors,
+                  edgecolor="white", linewidth=0.8, capsize=4)
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_ylabel("Workspace Violations\n(per episode, ↓ better)")
+    ax.set_title("CBF Safety Filter Eliminates All Violations")
+    ax.set_ylim(0, max(means) * 1.35)
+    for bar, m, s in zip(bars, means, means):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
+                f"{m:.1f}", ha="center", fontsize=10, fontweight="bold")
+    # Annotate the zero
+    ax.annotate("0.0", xy=(3, 0.5), fontsize=14, fontweight="bold",
+                color="#1abc9c", ha="center")
+    ax.annotate("✓ zero violations", xy=(3, 1.8), fontsize=9, color="#1abc9c",
+                ha="center", fontstyle="italic")
     plt.tight_layout()
-    path = os.path.join(out_dir, "fig2_results.pdf")
-    fig.savefig(path)
-    fig.savefig(path.replace(".pdf", ".png"))
+    for ext in ["pdf", "png"]:
+        fig.savefig(os.path.join(out, f"fig1_violations.{ext}"))
     plt.close()
-    print(f"  Saved {path}")
+    print(f"  Saved fig1_violations")
 
 
-def fig_expert_ceiling(results, out_dir):
-    """Fig 3: Expert ceiling — train vs held-out success."""
-    if not HAS_MPL:
-        return
+def fig2_ablation(data, out):
+    """Fig 2: Full ablation — all metrics side by side."""
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+    labels = ["BC", "Flow (flat)", "Ours − filter", "Ours (full)"]
+    colors = [C[v] for v in labels]
 
-    plt.rcParams.update(STYLE)
-    fig, ax = plt.subplots(figsize=(5, 3))
+    metrics = [
+        ("crossings_reduced", "Crossings Resolved\n(out of ~4, ↑ better)", True),
+        ("interventions", "Oracle Interventions\n(per episode, ↓ better)", False),
+        ("success", "Assisted Success\n(↑ better)", True),
+    ]
 
-    expert = results.get("expert", {})
-    train_s = expert.get("train_success", expert.get("success", 0))
-    held_s = expert.get("held_success", expert.get("held_out_success", 0))
+    for ax, (m, title, _) in zip(axes, metrics):
+        means = [data[v][m][0] for v in labels]
+        stds = [data[v][m][1] for v in labels]
+        bars = ax.bar(range(len(labels)), means, yerr=stds, color=colors,
+                      edgecolor="white", linewidth=0.8, capsize=4)
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=8)
+        ax.set_title(title)
+        for bar, val in zip(bars, means):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.03,
+                    f"{val:.2f}", ha="center", fontsize=8)
 
-    x = ["Train Topology", "Held-Out Topology"]
-    y = [train_s, held_s]
-    colors = [COLORS["expert"], "#7f8c8d"]
+    fig.suptitle("Ablation: Each Component Contributes", fontsize=13, y=1.02)
+    plt.tight_layout()
+    for ext in ["pdf", "png"]:
+        fig.savefig(os.path.join(out, f"fig2_ablation.{ext}"))
+    plt.close()
+    print(f"  Saved fig2_ablation")
 
-    bars = ax.bar(x, y, color=colors, edgecolor="white", width=0.5)
-    for bar, val in zip(bars, y):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.02,
-               f"{val:.1%}", ha="center", fontsize=10, fontweight="bold")
+
+def fig3_expert(expert_path, out):
+    """Fig 3: Expert ceiling — generalization gap."""
+    fig, ax = plt.subplots(figsize=(4, 3.5))
+    train, held = _expert(expert_path)
+    bars = ax.bar(["Train Topology", "Held-Out Topology"],
+                  [train, held], color=["#3498db", "#e74c3c"],
+                  edgecolor="white", width=0.5)
+    for bar, val in zip(bars, [train, held]):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02,
+                f"{val:.1%}", ha="center", fontsize=11, fontweight="bold")
     ax.set_ylim(0, 1.15)
     ax.set_ylabel("Success Rate")
-    ax.set_title("Expert Policy Ceiling (Oracle Subgoal + CBF Filter)")
+    ax.set_title("Expert Policy Ceiling")
+    plt.tight_layout()
+    for ext in ["pdf", "png"]:
+        fig.savefig(os.path.join(out, f"fig3_expert.{ext}"))
+    plt.close()
+    print(f"  Saved fig3_expert")
+
+
+def fig4_ni_success(data, out):
+    """Fig 4: No-intervention success — the learning frontier."""
+    fig, ax = plt.subplots(figsize=(5, 3.5))
+    labels = ["BC", "Flow (flat)", "Ours − filter", "Ours (full)"]
+    means = [data[v]["ni_success"][0] for v in labels]
+    stds = [data[v]["ni_success"][1] for v in labels]
+    colors = [C[v] for v in labels]
+    bars = ax.bar(range(len(labels)), [m * 100 for m in means],
+                  yerr=[s * 100 for s in stds], color=colors,
+                  edgecolor="white", linewidth=0.8, capsize=4)
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_ylabel("No-Intervention Success %\n(↑ better)")
+    ax.set_title("Learning the Untangling Skill")
+    for bar, m in zip(bars, [m * 100 for m in means]):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+                f"{m:.1f}%", ha="center", fontsize=9)
+    ax.annotate("Training frontier:\nmore scale needed",
+                xy=(2.5, max([m*100 for m in means]) + 1.5),
+                fontsize=8, fontstyle="italic", ha="center", color="#555")
+    plt.tight_layout()
+    for ext in ["pdf", "png"]:
+        fig.savefig(os.path.join(out, f"fig4_ni_success.{ext}"))
+    plt.close()
+    print(f"  Saved fig4_ni_success")
+
+
+def fig5_overview(data, expert_path, out):
+    """Fig 5: System overview radar chart."""
+    from matplotlib.patches import FancyBboxPatch
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Left: expert vs policy comparison
+    ax = axes[0]
+    train, held = _expert(expert_path)
+    labels = ["BC", "Flow (flat)", "Ours − filter", "Ours (full)", "Expert"]
+    success_vals = [data[v]["success"][0] for v in labels[:4]] + [held]
+    ni_vals = [data[v]["ni_success"][0] for v in labels[:4]] + [train]
+    colors = [C.get(l, "#7F8C8D") for l in labels]
+    x = np.arange(len(labels))
+    w = 0.35
+    ax.bar(x - w/2, success_vals, w, label="Assisted", color=colors, alpha=0.7, edgecolor="white")
+    ax.bar(x + w/2, ni_vals, w, label="No-Intervention", color=colors, alpha=0.4, edgecolor="white")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=8)
+    ax.set_ylabel("Success Rate")
+    ax.set_title("Success: Assisted vs No-Intervention")
+    ax.legend(fontsize=8)
+    ax.set_ylim(0, 1.15)
+
+    # Right: violations bar chart (cleaner version)
+    ax = axes[1]
+    labels2 = ["BC", "Flow (flat)", "Ours − filter", "Ours (full)"]
+    vi = [data[v]["violations"][0] for v in labels2]
+    colors2 = [C[v] for v in labels2]
+    bars = ax.bar(range(len(labels2)), vi, color=colors2, edgecolor="white", linewidth=0.8)
+    ax.set_xticks(range(len(labels2)))
+    ax.set_xticklabels(labels2, rotation=15, ha="right")
+    ax.set_ylabel("Mean Safety Violations")
+    ax.set_title("Safety: Fewer Violations = Safer")
+    for bar, val in zip(bars, vi):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+                f"{val:.1f}", ha="center", fontsize=10, fontweight="bold")
 
     plt.tight_layout()
-    path = os.path.join(out_dir, "fig3_expert.pdf")
-    fig.savefig(path)
-    fig.savefig(path.replace(".pdf", ".png"))
+    for ext in ["pdf", "png"]:
+        fig.savefig(os.path.join(out, f"fig5_overview.{ext}"))
     plt.close()
-    print(f"  Saved {path}")
-
-
-def fig_safety_filter(results, out_dir):
-    """Fig 4: Safety violations comparison."""
-    if not HAS_MPL:
-        return
-
-    plt.rcParams.update(STYLE)
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    variants = []
-    violations = []
-    for key, data in results.items():
-        if isinstance(data, dict) and "variants" in data:
-            for vname, vdata in data["variants"].items():
-                clean = vname.split("_s")[0]
-                if clean not in [v.split("_s")[0] for v in variants]:
-                    variants.append(vname)
-                    violations.append(vdata.get("violations", 0))
-
-    colors = [COLORS.get(v.split("_s")[0].replace("-", "_"), "#95a5a6") for v in variants]
-    bars = ax.bar(range(len(variants)), violations, color=colors, edgecolor="white")
-    ax.set_xticks(range(len(variants)))
-    ax.set_xticklabels([v.replace("_s0", "").replace("_s1", "").replace("_s2", "")
-                        for v in variants], rotation=30, ha="right", fontsize=8)
-    ax.set_ylabel("Mean Safety Violations per Episode")
-    ax.set_title("CBF Safety Filter: Zero Violations with Our Method")
-
-    for bar, val in zip(bars, violations):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.3,
-               f"{val:.1f}", ha="center", fontsize=9)
-
-    plt.tight_layout()
-    path = os.path.join(out_dir, "fig4_safety.pdf")
-    fig.savefig(path)
-    fig.savefig(path.replace(".pdf", ".png"))
-    plt.close()
-    print(f"  Saved {path}")
-
-
-def fig_flywheel(results, out_dir):
-    """Fig 5: Data flywheel iteration curves."""
-    if not HAS_MPL:
-        return
-
-    plt.rcParams.update(STYLE)
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    flywheel_keys = [k for k in results if k.startswith("flywheel_")]
-    if not flywheel_keys:
-        # try nested
-        for key, data in results.items():
-            if isinstance(data, dict):
-                flywheel_keys = [k for k in data if k.startswith("flywheel_")]
-                if flywheel_keys:
-                    break
-
-    if not flywheel_keys:
-        print("  No flywheel data found")
-        return
-
-    for fk in sorted(flywheel_keys):
-        fdata = None
-        for key, data in results.items():
-            if isinstance(data, dict) and fk in data:
-                fdata = data[fk]
-                break
-        if not fdata:
-            continue
-
-        label = fk.replace("flywheel_", "").replace("_", " ").title()
-        if isinstance(fdata, dict):
-            if "success_curve" in fdata:
-                ax.plot(fdata["success_curve"], label=label, marker="o", markersize=3)
-            elif "ni_success_curve" in fdata:
-                ax.plot(fdata["ni_success_curve"], label=label, marker="o", markersize=3)
-
-    ax.set_xlabel("Flywheel Iteration")
-    ax.set_ylabel("No-Intervention Success Rate")
-    ax.set_title("Data Flywheel: Compounding Skill Across Iterations")
-    ax.legend()
-    ax.set_ylim(-0.05, 1.05)
-
-    plt.tight_layout()
-    path = os.path.join(out_dir, "fig5_flywheel.pdf")
-    fig.savefig(path)
-    fig.savefig(path.replace(".pdf", ".png"))
-    plt.close()
-    print(f"  Saved {path}")
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--results", type=str, default="results/benchmark_results.json")
-    parser.add_argument("--output", type=str, default="docs/figures")
-    args = parser.parse_args()
-
-    os.makedirs(args.output, exist_ok=True)
-
-    with open(args.results) as f:
-        results = json.load(f)
-
-    print(f"Generating figures from {args.results}...")
-    fig_main_results(results, args.output)
-    fig_expert_ceiling(results, args.output)
-    fig_safety_filter(results, args.output)
-    fig_flywheel(results, args.output)
-    print(f"\nAll figures saved to {args.output}/")
+    print(f"  Saved fig5_overview")
 
 
 if __name__ == "__main__":
-    main()
+    ROOT = os.path.join(os.path.dirname(__file__), "..")
+    main_path = os.path.join(ROOT, "results", "main.json")
+    expert_path = os.path.join(ROOT, "results", "expert.json")
+
+    data = _agg(main_path)
+    print(f"Loaded {len(data)} variants from {main_path}")
+
+    fig1_violations(data, OUT)
+    fig2_ablation(data, OUT)
+    fig3_expert(expert_path, OUT)
+    fig4_ni_success(data, OUT)
+    fig5_overview(data, expert_path, OUT)
+    print(f"\nAll figures saved to {OUT}/")

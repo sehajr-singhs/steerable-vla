@@ -249,6 +249,11 @@ def make_policy(kind, dims, tcfg: TrainConfig, dcfg: DataConfig):
     if kind == "ours_full":
         p = FlowExpert(dim_obs, dim_sub, dim_act, cfg=tcfg)
         return p
+    if kind == "transformer":
+        from .transformer_policy import TransformerPolicy
+        n_nodes = (dim_obs - 4) // 2
+        p = TransformerPolicy(n_nodes, dim_obs, hidden=tcfg.hidden, lr=tcfg.lr)
+        return p
     raise ValueError(kind)
 
 
@@ -257,7 +262,11 @@ def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
     torch.manual_seed(seed)
     rng = __import__("numpy").random.RandomState(seed)
     epochs = epochs or tcfg.epochs
-    opt = torch.optim.Adam(policy.parameters(), lr=tcfg.lr)
+    # Some policies (TransformerPolicy) have their own optimizer
+    if hasattr(policy, '_opt'):
+        opt = policy._opt
+    else:
+        opt = torch.optim.Adam(policy.parameters(), lr=tcfg.lr)
     import numpy as _np
     obs = torch.as_tensor(_np.array([it[0] for it in dataset]), device=device)
     sub = torch.as_tensor(_np.array([it[1] for it in dataset]), device=device)
@@ -273,11 +282,18 @@ def train_policy(policy, dataset, tcfg: TrainConfig, dcfg: DataConfig,
         for b in range(0, n, tcfg.batch):
             idx = perm[b:b + tcfg.batch]
             ob, su, ch, nu = obs[idx], sub[idx], chunk[idx], nudge[idx]
+            # TransformerPolicy handles its own optimization internally
+            if hasattr(policy, 'train_step') and not isinstance(policy, (FlowExpert, BCPolicy)):
+                loss = policy.train_step(ob, ch)
+                tot += float(loss) * len(idx)
+                continue
             opt.zero_grad()
             if isinstance(policy, BCPolicy):
                 loss = policy.forward(ob, su, g1=ch)
-            else:
+            elif hasattr(policy, 'cfm_loss'):
                 loss = policy.cfm_loss(ob, su, ch, nu, rng, dcfg.steer_prob)
+            else:
+                loss = policy.forward(ob, su, g1=ch)
             loss.backward()
             opt.step()
             tot += float(loss.detach()) * len(idx)
